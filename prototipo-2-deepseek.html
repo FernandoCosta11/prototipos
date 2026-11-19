@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confere Aí — protótipo</title>
+<!--
+  PROTÓTIPO "CONFERE AÍ" — Interação Humano-Computador
+  Arquivo único, sem back-end, sem bibliotecas externas e sem chamadas de rede.
+  Todos os dados ficam em memória (no dispositivo). Instituições e contatos são fictícios.
+
+  SUPOSIÇÃO 1: o tipo de comunicação também é obrigatório em "Informar a comunicação",
+  além do conteúdo e do remetente exigidos no RF04, porque o histórico e o relato
+  precisam do tipo para ficarem legíveis.
+  SUPOSIÇÃO 2: "Entender um sinal" (RF07) abre uma tela própria com a explicação
+  detalhada de cada sinal encontrado no resultado.
+  SUPOSIÇÃO 3: a opção "Nenhum" em "o que está sendo pedido" é exclusiva: ao marcá-la,
+  as demais são desmarcadas, e vice-versa.
+  SUPOSIÇÃO 4: ao "Concluir" em "Ver o que fazer agora" sem ter passado por uma
+  verificação (entrada "Já caí ou quase caí"), o histórico recebe um registro genérico
+  com o rótulo "O que fazer agora concluído".
+  SUPOSIÇÃO 5: o histórico é mantido apenas em memória, conforme o formato da entrega
+  ("dados em memória"), e por isso começa vazio a cada carregamento.
+-->
+<style>
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:16px;
+    line-height:1.5;
+    color:#16211f;
+    background:#e8ecea;
+  }
+  .app{
+    max-width:430px;
+    margin:0 auto;
+    min-height:100vh;
+    background:#fff;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 0 30px rgba(0,0,0,.10);
+  }
+
+  /* ---------- barra superior fixa (RF18) ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:30;
+    display:flex;align-items:center;justify-content:space-between;gap:6px;
+    padding:6px 10px;background:#0b5c4e;color:#fff;
+  }
+  .marca{font-size:13px;font-weight:700;letter-spacing:.02em;white-space:nowrap}
+  .topbtn{
+    min-height:44px;min-width:44px;padding:0 10px;border-radius:10px;
+    border:1.5px solid rgba(255,255,255,.55);background:transparent;color:#fff;
+    font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .topbtn:active{background:rgba(255,255,255,.16)}
+  .topbtn-ajuda{background:#fff;color:#0b5c4e;border-color:#fff}
+  .topbtn-ajuda:active{background:#d9e8e4}
+
+  /* ---------- sub-barra: voltar + progresso ---------- */
+  .subbar{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:8px 16px;background:#f4f7f6;border-bottom:1px solid #e0e6e4;
+  }
+  .subbar:empty{display:none}
+  .voltar{
+    min-height:44px;padding:0 8px;border:none;border-radius:8px;background:transparent;
+    color:#0b5c4e;font:inherit;font-size:15px;font-weight:600;cursor:pointer;
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .voltar:active{background:#e2ecea}
+  .progresso{flex:1;min-width:150px}
+  .barra{height:6px;border-radius:3px;background:#d7e0dd;overflow:hidden}
+  .barra span{display:block;height:100%;background:#127a67;border-radius:3px}
+  .progresso-texto{display:block;font-size:14px;color:#3c4a47;margin-top:4px}
+
+  /* ---------- conteúdo ---------- */
+  .tela{flex:1;padding:16px 16px 8px}
+  .titulo-tela{font-size:22px;line-height:1.25;margin:0 0 6px;color:#0b3f36}
+  .secao-titulo{font-size:17px;margin:22px 0 8px;color:#0b3f36}
+  .ajuda{font-size:16px;color:#3c4a47;margin:0 0 16px}
+  .texto-pequeno{font-size:15px;color:#3c4a47;margin:0 0 10px}
+  .vazio{font-size:16px;color:#3c4a47;background:#f4f7f6;border-radius:12px;padding:14px;margin:0}
+
+  /* ---------- início ---------- */
+  .pausa{
+    display:flex;gap:12px;align-items:flex-start;
+    background:#e6f2ef;border-left:6px solid #127a67;border-radius:12px;
+    padding:14px;margin:14px 0 18px;
+  }
+  .pausa-icone{font-size:20px;line-height:1.2}
+  .pausa p{margin:0;font-size:17px;color:#0b3f36}
+  .entradas{display:flex;flex-direction:column;gap:10px;margin-bottom:22px}
+
+  .proto{background:#f4f7f6;border:1px dashed #9fb5b0;border-radius:12px;padding:14px;margin-bottom:22px}
+  .proto-titulo{font-size:15px;margin:0 0 6px;color:#0b3f36;text-transform:none}
+
+  .historico{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .hist-item{
+    width:100%;display:flex;flex-direction:column;gap:2px;text-align:left;
+    min-height:44px;padding:12px 14px;border:1px solid #dfe6e4;border-radius:12px;
+    background:#fff;font:inherit;cursor:pointer;
+  }
+  .hist-item:active{background:#f4f7f6}
+  .hist-data{font-size:14px;color:#4a5855}
+  .hist-tipo{font-size:16px;font-weight:600;color:#16211f}
+  .hist-rotulo{font-size:15px;color:#0b5c4e;font-weight:600}
+
+  /* ---------- formulários ---------- */
+  .campo{margin-bottom:20px}
+  .rotulo{display:block;font-size:16px;font-weight:600;margin-bottom:8px;color:#16211f}
+  textarea,input[type=text]{
+    width:100%;font:inherit;font-size:16px;padding:12px;min-height:48px;
+    border:2px solid #b9c7c3;border-radius:12px;background:#fff;color:#16211f;
+  }
+  textarea{min-height:130px;resize:vertical}
+  textarea:focus,input[type=text]:focus,.chip:focus,.btn:focus,.voltar:focus,.topbtn:focus{
+    outline:3px solid #127a67;outline-offset:2px;
+  }
+  .invalido{border-color:#a3231b;background:#fdf3f2}
+  .erro{
+    margin:8px 0 0;font-size:15px;font-weight:600;color:#a3231b;
+    display:flex;gap:6px;align-items:flex-start;
+  }
+  .resumo-erros{
+    background:#fdecea;border-left:6px solid #a3231b;border-radius:12px;
+    padding:12px 14px;margin-bottom:18px;color:#7d1a14;font-size:16px;
+  }
+
+  .opcoes{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    min-height:44px;padding:10px 16px;border-radius:24px;
+    border:2px solid #b9c7c3;background:#fff;color:#16211f;
+    font:inherit;font-size:16px;cursor:pointer;
+  }
+  .chip:active{background:#eef2f1}
+  .chip[aria-pressed="true"]{
+    border-color:#127a67;background:#e6f2ef;color:#0b3f36;font-weight:700;
+  }
+  .chip[aria-pressed="true"]::before{content:"✓ ";font-weight:700}
+
+  /* ---------- perguntas rápidas ---------- */
+  .pergunta{padding:14px 0;border-bottom:1px solid #e6ebe9}
+  .pergunta:last-of-type{border-bottom:none}
+  .pergunta-texto{margin:0 0 10px;font-size:17px;font-weight:600;color:#16211f;display:flex;gap:10px}
+  .num{
+    flex:none;width:26px;height:26px;border-radius:50%;background:#127a67;color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;
+  }
+  .contador{font-size:15px;color:#3c4a47;margin:14px 0 0}
+
+  /* ---------- resultado ---------- */
+  .risco{display:flex;align-items:center;gap:12px;border-radius:14px;padding:16px;margin:10px 0 16px}
+  .risco-icone{
+    flex:none;width:38px;height:38px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;
+  }
+  .risco-nivel{display:block;font-size:20px;font-weight:800;line-height:1.2}
+  .risco-pontos{display:block;font-size:15px;font-weight:500}
+  .risco-baixo{background:#e7f6ea;color:#14622a}
+  .risco-baixo .risco-icone{background:#14622a;color:#fff}
+  .risco-medio{background:#fff4d6;color:#6b4b00}
+  .risco-medio .risco-icone{background:#6b4b00;color:#fff}
+  .risco-alto{background:#fdecea;color:#a3231b}
+  .risco-alto .risco-icone{background:#a3231b;color:#fff}
+
+  .recomendacao{
+    background:#f4f7f6;border-left:6px solid #127a67;border-radius:12px;
+    padding:14px;margin:0 0 8px;font-size:16px;color:#16211f;
+  }
+  .aviso-baixo{
+    background:#fff4d6;border-radius:12px;padding:14px;margin:12px 0 0;
+    font-size:16px;color:#6b4b00;border-left:6px solid #6b4b00;
+  }
+
+  .sinais-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .sinais-lista li{
+    border:1px solid #dfe6e4;border-left:6px solid #127a67;border-radius:12px;
+    padding:12px 14px;background:#fff;
+  }
+  .sinais-lista strong{display:block;font-size:16px;color:#16211f}
+  .sinais-lista span{display:block;font-size:15px;color:#3c4a47;margin-top:2px}
+
+  .sinal-detalhe{border:1px solid #dfe6e4;border-radius:12px;padding:14px;margin-bottom:10px}
+  .sinal-detalhe h3{margin:0 0 6px;font-size:17px;color:#0b3f36}
+  .sinal-detalhe p{margin:0;font-size:16px;color:#3c4a47}
+
+  /* ---------- cards genéricos ---------- */
+  .card{border:1px solid #dfe6e4;border-radius:12px;padding:14px;margin-bottom:12px;background:#fff}
+  .card h3{margin:0 0 8px;font-size:17px;color:#0b3f36}
+  .card p{margin:0 0 8px;font-size:16px;color:#16211f}
+  .card p:last-child{margin-bottom:0}
+  .card dl{margin:0;font-size:16px}
+  .card dt{font-weight:700;color:#0b3f36;margin-top:10px}
+  .card dt:first-child{margin-top:0}
+  .card dd{margin:2px 0 0;color:#16211f;word-break:break-word}
+  .etiqueta{
+    display:inline-block;font-size:14px;font-weight:700;padding:4px 10px;border-radius:20px;
+    background:#e6f2ef;color:#0b3f36;margin-bottom:8px;
+  }
+
+  /* ---------- passos ---------- */
+  .passo{
+    display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;
+    min-height:52px;padding:12px 14px;margin-bottom:8px;
+    border:2px solid #dfe6e4;border-radius:12px;background:#fff;
+    font:inherit;font-size:16px;color:#16211f;cursor:pointer;
+  }
+  .passo .caixa{
+    flex:none;width:26px;height:26px;border-radius:7px;border:2px solid #7d8c89;
+    display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;background:#fff;
+  }
+  .passo[aria-pressed="true"]{border-color:#127a67;background:#f0f8f6}
+  .passo[aria-pressed="true"] .caixa{background:#127a67;border-color:#127a67}
+  .passo[aria-pressed="true"] .texto{color:#0b3f36;text-decoration:line-through;text-decoration-thickness:2px}
+
+  .acoes-linha{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+
+  /* ---------- acordeão de sinais de alerta ---------- */
+  details.golpe{border:1px solid #dfe6e4;border-radius:12px;margin-bottom:10px;background:#fff;overflow:hidden}
+  details.golpe summary{
+    padding:14px;font-size:17px;font-weight:700;color:#0b3f36;cursor:pointer;
+    min-height:44px;display:flex;align-items:center;gap:8px;list-style:none;
+  }
+  details.golpe summary::-webkit-details-marker{display:none}
+  details.golpe summary::before{content:"▸";color:#127a67;font-size:15px}
+  details.golpe[open] summary::before{content:"▾"}
+  details.golpe .corpo{padding:0 14px 14px}
+  details.golpe .corpo h4{margin:12px 0 4px;font-size:15px;color:#0b3f36;text-transform:uppercase;letter-spacing:.03em}
+  details.golpe .corpo h4:first-child{margin-top:0}
+  details.golpe .corpo p{margin:0;font-size:16px;color:#16211f}
+
+  /* ---------- botões ---------- */
+  .acoes{
+    position:sticky;bottom:0;z-index:25;
+    display:flex;flex-direction:column;gap:8px;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    background:#fff;border-top:1px solid #e0e6e4;
+  }
+  .acoes:empty{display:none}
+  .btn{
+    display:block;width:100%;min-height:48px;padding:12px 14px;border-radius:12px;
+    font:inherit;font-size:16px;font-weight:700;border:2px solid transparent;
+    cursor:pointer;text-align:center;
+  }
+  .btn-primario{background:#127a67;color:#fff;border-color:#127a67}
+  .btn-primario:active{background:#0b5c4e}
+  .btn-secundario{background:#fff;color:#0b5c4e;border-color:#127a67}
+  .btn-secundario:active{background:#e6f2ef}
+  .btn-neutro{background:#eef2f1;color:#16211f;border-color:#b9c7c3}
+  .btn-neutro:active{background:#e0e6e4}
+  .btn-perigo{background:#a3231b;color:#fff;border-color:#a3231b}
+  .btn-perigo:active{background:#7d1a14}
+
+  /* ---------- relato ---------- */
+  .status{
+    border-radius:12px;padding:14px;margin-top:14px;font-size:16px;font-weight:600;
+  }
+  .status-ok{background:#e7f6ea;color:#14622a;border-left:6px solid #14622a}
+  .status-espera{background:#fff4d6;color:#6b4b00;border-left:6px solid #6b4b00}
+
+  .switch{
+    display:flex;gap:12px;align-items:center;width:100%;min-height:48px;
+    padding:12px 14px;border:2px solid #b9c7c3;border-radius:12px;background:#fff;
+    font:inherit;font-size:16px;color:#16211f;cursor:pointer;text-align:left;
+  }
+  .switch .marca-switch{
+    flex:none;width:46px;height:26px;border-radius:13px;background:#b9c7c3;position:relative;
+  }
+  .switch .marca-switch::after{
+    content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+    background:#fff;transition:left .15s;
+  }
+  .switch[aria-pressed="true"] .marca-switch{background:#127a67}
+  .switch[aria-pressed="true"] .marca-switch::after{left:23px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <button type="button" class="topbtn" data-action="topo-inicio">Início</button>
+    <span class="marca">Confere Aí</span>
+    <button type="button" class="topbtn topbtn-ajuda" data-action="topo-ajuda">Pedir ajuda agora</button>
+  </header>
+  <div class="subbar" id="subbar"></div>
+  <main class="tela" id="tela"></main>
+  <div class="acoes" id="acoes"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* =========================================================
+     DADOS DE EXEMPLO (seção 7) — tudo fictício
+     ========================================================= */
+
+  var TIPOS = {
+    'mensagem': 'Mensagem',
+    'ligacao': 'Ligação',
+    'email': 'E-mail',
+    'link-arquivo': 'Link ou arquivo'
+  };
+
+  var REMETENTES = {
+    'conhecida': 'Pessoa conhecida',
+    'instituicao': 'Instituição',
+    'desconhecido': 'Desconhecido'
+  };
+
+  var PEDIDOS = [
+    { id: 'pix',     label: 'Pix ou pagamento', pontos: 2 },
+    { id: 'codigo',  label: 'Código',           pontos: 3 },
+    { id: 'dados',   label: 'Dados pessoais',   pontos: 3 },
+    { id: 'link',    label: 'Link',             pontos: 1 },
+    { id: 'arquivo', label: 'Arquivo',          pontos: 1 }
+  ];
+
+  var SINAIS_PEDIDO = {
+    pix: {
+      titulo: 'Pede Pix ou pagamento',
+      curto: 'Pagamento pedido com urgência e por mensagem é sinal de alerta.',
+      longo: 'Golpistas criam uma história com prazo curto para você pagar sem pensar. Antes de qualquer Pix, confirme a pessoa por uma ligação para o número que você já tem salvo, ou confirme a instituição pelo telefone do seu cartão.'
+    },
+    codigo: {
+      titulo: 'Pede código',
+      curto: 'Nenhuma instituição pede código por mensagem. O código é só seu.',
+      longo: 'O código que chega por SMS serve para confirmar operações. Quem pede esse código está tentando entrar na sua conta ou concluir uma compra. Nunca repasse o código para ninguém, nem por mensagem, nem por ligação.'
+    },
+    dados: {
+      titulo: 'Pede dados pessoais',
+      curto: 'Dados pessoais não devem ser enviados por mensagem ou ligação.',
+      longo: 'Nome completo, CPF, endereço, número do cartão e senha não devem ser enviados por mensagem, e-mail ou ligação. Se precisar atualizar algo, faça isso você mesmo no aplicativo ou no site digitado por você.'
+    },
+    link: {
+      titulo: 'Pede para abrir link',
+      curto: 'Links podem levar a páginas falsas que imitam o site oficial.',
+      longo: 'Um link em mensagem pode abrir uma página que parece verdadeira e pedir seus dados. Em vez de clicar, digite você mesmo o endereço do site oficial no navegador ou abra o aplicativo da instituição.'
+    },
+    arquivo: {
+      titulo: 'Pede para abrir arquivo',
+      curto: 'Arquivos podem instalar programas perigosos no celular.',
+      longo: 'Arquivos recebidos de desconhecidos podem instalar programas que leem suas mensagens e senhas. Não abra o arquivo e apague a mensagem.'
+    }
+  };
+
+  var SINAL_DESCONHECIDO = {
+    titulo: 'Remetente desconhecido',
+    curto: 'Você não sabe quem está do outro lado.',
+    longo: 'Quando o remetente é desconhecido, não existe histórico de confiança. Confirme por um canal que você já conhece: o telefone do seu cartão, o site digitado por você ou o número salvo da pessoa.'
+  };
+
+  var PERGUNTAS = [
+    {
+      texto: 'Pede pressa?',
+      sim: {
+        titulo: 'Pede pressa',
+        curto: 'Pedido legítimo não exige decisão em minutos.',
+        longo: 'Golpes criam um prazo curto para você não ter tempo de conferir. Quem é de verdade pode esperar alguns minutos enquanto você liga para a pessoa ou para a instituição por um canal que já conhece.'
+      },
+      incerto: {
+        titulo: 'Talvez peça pressa',
+        curto: 'Releia a mensagem com calma antes de responder.',
+        longo: 'Observe palavras como "urgente", "hoje", "agora" ou "última chance". Se existir um prazo curto, trate como sinal de alerta e confirme por outro canal.'
+      }
+    },
+    {
+      texto: 'Pede segredo?',
+      sim: {
+        titulo: 'Pede segredo',
+        curto: 'Ninguém de confiança pede para você esconder a conversa.',
+        longo: 'Pedir sigilo impede que outra pessoa ajude você a perceber o golpe. Instituições não pedem segredo, e pessoas próximas não têm motivo para isso.'
+      },
+      incerto: {
+        titulo: 'Talvez peça segredo',
+        curto: 'Verifique se alguém está pedindo para você não contar a ninguém.',
+        longo: 'Se a mensagem sugere "não fale com ninguém" ou "isso fica entre nós", trate como sinal de alerta e conte para alguém de confiança.'
+      }
+    },
+    {
+      texto: 'O remetente é um número ou endereço novo?',
+      sim: {
+        titulo: 'Número ou endereço novo',
+        curto: 'Confirme por um canal que você já usa antes de continuar.',
+        longo: 'Um contato novo pode ser alguém que trocou de chip, mas também pode ser alguém se passando por uma pessoa conhecida. Ligue para o número antigo, que já está salvo no seu celular.'
+      },
+      incerto: {
+        titulo: 'Você não sabe se o contato é novo',
+        curto: 'Compare com os contatos que você já tem salvos.',
+        longo: 'Abra sua lista de contatos e confira se aquele número ou endereço já estava lá. Se não conseguir confirmar, use o contato antigo para falar com a pessoa.'
+      }
+    },
+    {
+      texto: 'A oferta é boa demais?',
+      sim: {
+        titulo: 'Oferta boa demais',
+        curto: 'Vantagem exagerada é uma forma comum de atrair a vítima.',
+        longo: 'Descontos muito altos, prêmios que você não pediu e dinheiro fácil aparecem justamente para apressar a decisão. Compare com o que a instituição divulga nos canais oficiais.'
+      },
+      incerto: {
+        titulo: 'Oferta que você não esperava',
+        curto: 'Confira se a oferta existe nos canais oficiais.',
+        longo: 'Se você não estava esperando aquela promoção ou prêmio, procure a instituição pelo site digitado por você e veja se a ação existe de verdade.'
+      }
+    },
+    {
+      texto: 'Usa seus dados pessoais?',
+      sim: {
+        titulo: 'Usa seus dados pessoais',
+        curto: 'Confira se a mensagem já sabe demais sobre você.',
+        longo: 'Quando a mensagem mostra seu nome completo, parte do CPF ou dados de uma compra, ela parece mais verdadeira. Esses dados podem ter vazado, então não confirme nada por esse canal.'
+      },
+      incerto: {
+        titulo: 'Talvez use seus dados pessoais',
+        curto: 'Observe se a mensagem cita dados seus.',
+        longo: 'Se a mensagem cita seu nome, endereço ou números de documentos, ela pode estar usando dados vazados para parecer legítima. Confirme sempre por um canal oficial.'
+      }
+    }
+  ];
+
+  var INSTITUICOES = [
+    {
+      id: 'banco-exemplo',
+      nome: 'Banco Exemplo',
+      telefones: ['0800 000 0000', '(11) 0000-0000'],
+      site: 'www.bancoexemplo.com.br',
+      perfis: ['@bancoexemplo — perfil verificado no aplicativo'],
+      comoContata: 'O Banco Exemplo fala com você pelo aplicativo oficial. Ele nunca pede código, senha ou Pix por mensagem, ligação ou e-mail.'
+    },
+    {
+      id: 'loja-exemplo',
+      nome: 'Loja Exemplo',
+      telefones: ['0800 111 1111'],
+      site: 'www.lojaexemplo.com.br',
+      perfis: ['@lojaexemplo — perfil verificado na rede social'],
+      comoContata: 'A Loja Exemplo envia avisos de pedido para o e-mail cadastrado e não pede dados do cartão por mensagem.'
+    },
+    {
+      id: 'operadora-exemplo',
+      nome: 'Operadora Exemplo',
+      telefones: ['0800 222 2222'],
+      site: 'www.operadoraexemplo.com.br',
+      perfis: ['@operadoraexemplo — perfil verificado na rede social'],
+      comoContata: 'A Operadora Exemplo avisa sobre a conta dentro do aplicativo oficial e nunca pede código por ligação.'
+    }
+  ];
+
+  var EXEMPLOS = {
+    A: {
+      tipo: 'mensagem',
+      remetente: 'conhecida',
+      pedidos: ['pix'],
+      conteudo: 'Oi Lari, sou eu, a Bia da turma de Bioquímica. Troquei de chip, salva esse número. Preciso de uma ajuda urgente: consegue fazer um Pix de R$ 380 pra pagar uma conta que vence hoje? Te devolvo à tarde.'
+    },
+    B: {
+      tipo: 'email',
+      remetente: 'instituicao',
+      pedidos: ['codigo'],
+      conteudo: 'Banco Exemplo: identificamos atividade suspeita. Sua conta será bloqueada em 30 minutos. Informe ao nosso atendente o código que você vai receber por SMS para cancelar o bloqueio.'
+    }
+  };
+
+  var SITUACOES = [
+    {
+      id: 'nao-interagi',
+      label: 'Não interagi',
+      passos: [
+        'Não responda à mensagem e não clique em nada.',
+        'Bloqueie o contato e apague a conversa.',
+        'Avise a pessoa ou a instituição que o remetente dizia ser, por um canal que você já conhece.',
+        'Se quiser, relate a tentativa para alertar outras pessoas.'
+      ]
+    },
+    {
+      id: 'cliquei-link',
+      label: 'Cliquei no link',
+      passos: [
+        'Feche a página e não preencha nada nela.',
+        'Não digite senha nem código no site que abriu.',
+        'Se instalou algum aplicativo sem querer, desinstale.',
+        'Troque a senha do aplicativo por onde a mensagem chegou, usando o aplicativo oficial.',
+        'Acompanhe o extrato do banco e avise a instituição pelo telefone do seu cartão.'
+      ]
+    },
+    {
+      id: 'informei-dados',
+      label: 'Informei dados ou código',
+      passos: [
+        'Ligue para o banco pelo telefone do cartão ou do site oficial e peça o bloqueio do acesso.',
+        'Troque as senhas dos aplicativos envolvidos.',
+        'Ative a verificação em duas etapas nas suas contas.',
+        'Acompanhe o extrato e o registro de transações.',
+        'Guarde prints, horários e comprovantes.'
+      ]
+    },
+    {
+      id: 'paguei',
+      label: 'Paguei',
+      passos: [
+        'Ligue para o seu banco e informe o Pix que você fez.',
+        'Peça o cancelamento ou a devolução pelo MED (Mecanismo Especial de Devolução) do Pix.',
+        'Registre um boletim de ocorrência na delegacia virtual do seu estado.',
+        'Guarde comprovante, prints e o horário da transação.',
+        'Relate a tentativa para alertar outras pessoas.'
+      ]
+    }
+  ];
+
+  var TIPOS_DE_GOLPE = [
+    {
+      titulo: 'Falso parente ou amigo',
+      comoFunciona: 'Alguém se passa por uma pessoa próxima, diz que trocou de número e pede dinheiro com urgência.',
+      sinais: 'Número novo, pedido de Pix com prazo curto, pedido para não contar a ninguém, jeito de escrever diferente do habitual.',
+      exemplo: '"Oi, sou eu, troquei de chip. Preciso de um Pix urgente, te devolvo hoje."',
+      comoConfirmar: 'Ligue para o número antigo que já está salvo no seu celular e faça uma pergunta que só aquela pessoa saberia responder.'
+    },
+    {
+      titulo: 'Falsa central do banco',
+      comoFunciona: 'Alguém diz ser do banco, avisa de uma suposta atividade suspeita e pede um código ou uma senha para "cancelar o bloqueio".',
+      sinais: 'Aviso de bloqueio imediato, pedido de código recebido por SMS, número diferente do que está no cartão, tom de urgência.',
+      exemplo: '"Sua conta será bloqueada em 30 minutos. Informe o código que vai chegar por SMS."',
+      comoConfirmar: 'Desligue e ligue para o telefone que está impresso no seu cartão ou no site oficial digitado por você.'
+    },
+    {
+      titulo: 'Falsa cobrança',
+      comoFunciona: 'Chega um aviso de dívida, boleto ou assinatura que você não reconhece, com link para "regularizar".',
+      sinais: 'Cobrança de algo que você não contratou, link para pagar, desconto grande para pagamento imediato.',
+      exemplo: '"Última chance: regularize sua dívida com 70% de desconto pelo link."',
+      comoConfirmar: 'Abra o aplicativo ou o site oficial da empresa digitando o endereço você mesmo e procure a cobrança por lá.'
+    },
+    {
+      titulo: 'Falsa vaga ou promoção',
+      comoFunciona: 'Oferecem emprego, prêmio ou promoção boa demais e pedem dados pessoais ou um pagamento para "liberar" o benefício.',
+      sinais: 'Vaga que você não se candidatou, prêmio que você não disputou, pedido de taxa antecipada, pedido de dados pessoais por mensagem.',
+      exemplo: '"Você foi selecionado! Pague a taxa de cadastro e comece amanhã."',
+      comoConfirmar: 'Procure a empresa pelo site oficial digitado por você e confira se a vaga ou promoção existe de verdade.'
+    }
+  ];
+
+  /* =========================================================
+     ESTADO
+     ========================================================= */
+
+  function novoRascunho() {
+    return {
+      tipo: '',
+      conteudo: '',
+      remetente: '',
+      pedidos: [],
+      respostas: [null, null, null, null, null]
+    };
+  }
+
+  var state = {
+    rascunho: novoRascunho(),
+    resultadoAtual: null,
+    historico: [],
+    erros: {},
+    erroPerguntas: '',
+    oQueFazer: { situacao: '', concluidos: {} },
+    relato: { anonimo: true, identificacao: '', falha: false, status: null },
+    avisoTexto: '',
+    buscaInst: '',
+    instSelecionada: null,
+    buscaFeita: false
+  };
+
+  var pilha = ['inicio'];
+
+  /* =========================================================
+     UTILITÁRIOS
+     ========================================================= */
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtData(iso) {
+    var d = new Date(iso);
+    return d.toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function semAcento(s) {
+    return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  function navegar(tela, opts) {
+    opts = opts || {};
+    if (opts.limpar) {
+      pilha = [tela];
+    } else if (opts.substituir) {
+      pilha[pilha.length - 1] = tela;
+    } else if (pilha[pilha.length - 1] !== tela) {
+      pilha.push(tela);
+    }
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function voltar() {
+    if (pilha.length > 1) {
+      pilha.pop();
+      render();
+      window.scrollTo(0, 0);
+    }
+  }
+
+  function telaAtual() {
+    return pilha[pilha.length - 1];
+  }
+
+  function telaAnterior() {
+    return pilha.length > 1 ? pilha[pilha.length - 2] : null;
+  }
+
+  /* =========================================================
+     REGRA DE CÁLCULO DO RISCO (seção 4)
+     ========================================================= */
+
+  function calcularResultado(d) {
+    var sinais = [];
+    var pontos = 0;
+    var i, r;
+
+    for (i = 0; i < PERGUNTAS.length; i++) {
+      r = d.respostas[i];
+      if (r === 'sim') {
+        pontos += 2;
+        sinais.push(PERGUNTAS[i].sim);
+      } else if (r === 'nao-sei') {
+        pontos += 1;
+        sinais.push(PERGUNTAS[i].incerto);
+      }
+    }
+
+    var melhorPedido = 0;
+    d.pedidos.forEach(function (p) {
+      var def = null;
+      for (var k = 0; k < PEDIDOS.length; k++) {
+        if (PEDIDOS[k].id === p) { def = PEDIDOS[k]; }
+      }
+      if (!def) { return; }
+      if (def.pontos > melhorPedido) { melhorPedido = def.pontos; }
+      if (SINAIS_PEDIDO[p]) { sinais.push(SINAIS_PEDIDO[p]); }
+    });
+    pontos += melhorPedido;
+
+    if (d.remetente === 'desconhecido') {
+      pontos += 1;
+      sinais.push(SINAL_DESCONHECIDO);
+    }
+
+    var risco = 'baixo';
+    if (pontos >= 7) {
+      risco = 'alto';
+    } else if (pontos >= 3) {
+      risco = 'medio';
+    }
+
+    return { pontos: pontos, risco: risco, sinais: sinais };
+  }
+
+  /* =========================================================
+     HISTÓRICO
+     ========================================================= */
+
+  function salvarNoHistorico(base, rotulo) {
+    var item = {
+      id: 'v' + Date.now() + Math.random().toString(36).slice(2, 6),
+      data: new Date().toISOString(),
+      tipo: base.tipo || '',
+      tipoLabel: TIPOS[base.tipo] || 'Não informado',
+      rotulo: rotulo,
+      risco: base.risco || null,
+      pontos: (base.pontos === undefined ? null : base.pontos),
+      sinais: base.sinais || [],
+      conteudo: base.conteudo || '',
+      remetente: base.remetente || '',
+      pedidos: base.pedidos || [],
+      respostas: base.respostas || [],
+      salvo: true
+    };
+    state.historico.unshift(item);
+    return item;
+  }
+
+  function concluir(rotulo) {
+    var r = state.resultadoAtual;
+    if (r && !r.salvo) {
+      salvarNoHistorico(r, rotulo);
+      r.salvo = true;
+    } else if (!r) {
+      salvarNoHistorico({}, rotulo);
+    }
+    state.resultadoAtual = null;
+    state.rascunho = novoRascunho();
+    state.erros = {};
+    state.erroPerguntas = '';
+    state.oQueFazer = { situacao: '', concluidos: {} };
+    navegar('inicio', { limpar: true });
+  }
+
+  /* =========================================================
+     TELAS
+     ========================================================= */
+
+  /* ---------- INÍCIO ---------- */
+  function telaInicio() {
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Confere Aí</h1>' +
+      '<div class="pausa">' +
+        '<span class="pausa-icone" aria-hidden="true">⏸</span>' +
+        '<p><strong>Pare e respire:</strong> pedido legítimo não exige decisão em minutos.</p>' +
+      '</div>' +
+
+      '<div class="entradas">' +
+        '<button type="button" class="btn btn-primario" data-action="nova-verificacao">Verificar uma comunicação</button>' +
+        '<button type="button" class="btn btn-secundario" data-action="ja-cai">Já caí ou quase caí</button>' +
+        '<button type="button" class="btn btn-secundario" data-action="abrir-sinais">Conhecer os sinais de alerta</button>' +
+      '</div>' +
+
+      '<section class="proto">' +
+        '<h2 class="proto-titulo">Recurso do protótipo: Simular compartilhamento</h2>' +
+        '<p class="texto-pequeno">No celular, você compartilharia a mensagem recebida com o Confere Aí. Aqui, escolha um dos exemplos:</p>' +
+        '<div class="opcoes">' +
+          '<button type="button" class="chip" data-action="simular" data-exemplo="A">Exemplo A (WhatsApp)</button>' +
+          '<button type="button" class="chip" data-action="simular" data-exemplo="B">Exemplo B (e-mail)</button>' +
+        '</div>' +
+      '</section>' +
+
+      '<section>' +
+        '<h2 class="secao-titulo">Suas verificações</h2>' +
+        (state.historico.length === 0
+          ? '<p class="vazio">Nenhuma verificação salva ainda. Quando você encerrar ou concluir uma verificação, ela aparece aqui.</p>'
+          : '<ul class="historico">' + state.historico.map(function (item) {
+              return '<li><button type="button" class="hist-item" data-action="abrir-historico" data-id="' + item.id + '">' +
+                '<span class="hist-data">' + esc(fmtData(item.data)) + '</span>' +
+                '<span class="hist-tipo">' + esc(item.tipoLabel) + '</span>' +
+                '<span class="hist-rotulo">' + esc(item.rotulo) + '</span>' +
+              '</button></li>';
+            }).join('') + '</ul>') +
+      '</section>';
+
+    return { conteudo: conteudo, acoes: '' };
+  }
+
+  /* ---------- INFORMAR A COMUNICAÇÃO ---------- */
+  function telaInformar() {
+    var d = state.rascunho;
+    var e = state.erros;
+    var temErro = Object.keys(e).length > 0;
+
+    var labelConteudo = d.tipo === 'ligacao' ? 'Descreva a ligação' : 'Conteúdo da comunicação';
+    var placeholder = d.tipo === 'ligacao'
+      ? 'Ex.: ligaram dizendo ser do banco e pediram um código.'
+      : 'Cole aqui o texto ou o link que você recebeu.';
+
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Informar a comunicação</h1>' +
+      '<p class="ajuda">Preencha o que você recebeu. Nada sai do seu celular.</p>' +
+
+      (temErro ? '<div class="resumo-erros" id="resumo-erros">Faltam informações para continuar. Veja os campos destacados abaixo.</div>' : '') +
+
+      '<div class="campo">' +
+        '<span class="rotulo">Tipo de comunicação</span>' +
+        '<div class="opcoes">' +
+          Object.keys(TIPOS).map(function (k) {
+            return '<button type="button" class="chip" data-action="set-tipo" data-v="' + k + '" aria-pressed="' + (d.tipo === k) + '">' + TIPOS[k] + '</button>';
+          }).join('') +
+        '</div>' +
+        (e.tipo ? '<p class="erro"><span aria-hidden="true">⚠</span>' + esc(e.tipo) + '</p>' : '') +
+      '</div>' +
+
+      '<div class="campo">' +
+        '<label class="rotulo" for="campo-conteudo">' + labelConteudo + '</label>' +
+        '<textarea id="campo-conteudo" data-field="conteudo" class="' + (e.conteudo ? 'invalido' : '') + '" placeholder="' + esc(placeholder) + '">' + esc(d.conteudo) + '</textarea>' +
+        (e.conteudo ? '<p class="erro"><span aria-hidden="true">⚠</span>' + esc(e.conteudo) + '</p>' : '') +
+      '</div>' +
+
+      '<div class="campo">' +
+        '<span class="rotulo">Quem o remetente diz ser</span>' +
+        '<div class="opcoes">' +
+          Object.keys(REMETENTES).map(function (k) {
+            return '<button type="button" class="chip" data-action="set-remetente" data-v="' + k + '" aria-pressed="' + (d.remetente === k) + '">' + REMETENTES[k] + '</button>';
+          }).join('') +
+        '</div>' +
+        (e.remetente ? '<p class="erro"><span aria-hidden="true">⚠</span>' + esc(e.remetente) + '</p>' : '') +
+      '</div>' +
+
+      '<div class="campo">' +
+        '<span class="rotulo">O que está sendo pedido (pode marcar mais de um)</span>' +
+        '<div class="opcoes">' +
+          PEDIDOS.map(function (p) {
+            return '<button type="button" class="chip" data-action="toggle-pedido" data-pedido="' + p.id + '" aria-pressed="' + (d.pedidos.indexOf(p.id) !== -1) + '">' + p.label + '</button>';
+          }).join('') +
+          '<button type="button" class="chip" data-action="toggle-pedido" data-pedido="nenhum" aria-pressed="' + (d.pedidos.length === 0) + '">Nenhum</button>' +
+        '</div>' +
+      '</div>';
+
+    var acoes = '<button type="button" class="btn btn-primario" data-action="avancar-informar">Continuar</button>';
+
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- PERGUNTAS RÁPIDAS ---------- */
+  function telaPerguntas() {
+    var d = state.rascunho;
+    var respondidas = d.respostas.filter(function (r) { return !!r; }).length;
+
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Perguntas rápidas</h1>' +
+      '<p class="ajuda">Responda com o que você lembra da comunicação. Se não tiver certeza, marque "Não sei".</p>' +
+
+      PERGUNTAS.map(function (p, i) {
+        return '<div class="pergunta">' +
+          '<p class="pergunta-texto"><span class="num" aria-hidden="true">' + (i + 1) + '</span>' + esc(p.texto) + '</p>' +
+          '<div class="opcoes">' +
+            '<button type="button" class="chip" data-action="resp" data-q="' + i + '" data-v="sim" aria-pressed="' + (d.respostas[i] === 'sim') + '">Sim</button>' +
+            '<button type="button" class="chip" data-action="resp" data-q="' + i + '" data-v="nao" aria-pressed="' + (d.respostas[i] === 'nao') + '">Não</button>' +
+            '<button type="button" class="chip" data-action="resp" data-q="' + i + '" data-v="nao-sei" aria-pressed="' + (d.respostas[i] === 'nao-sei') + '">Não sei</button>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+
+      '<p class="contador">' + respondidas + ' de 5 respondidas</p>' +
+      (state.erroPerguntas ? '<p class="erro"><span aria-hidden="true">⚠</span>' + esc(state.erroPerguntas) + '</p>' : '');
+
+    var acoes = '<button type="button" class="btn btn-primario" data-action="ver-resultado">Ver resultado</button>';
+
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- RESULTADO ---------- */
+  function telaResultado() {
+    var r = state.resultadoAtual;
+
+    if (!r) {
+      return {
+        conteudo: '<h1 class="titulo-tela">Resultado</h1><p class="ajuda">Nenhuma verificação aberta. Comece uma nova verificação pela tela Início.</p>',
+        acoes: '<button type="button" class="btn btn-primario" data-action="nova-verificacao">Verificar uma comunicação</button>'
+      };
+    }
+
+    var cfg = {
+      baixo: { icone: '✓', texto: 'Risco baixo', cls: 'risco-baixo' },
+      medio: { icone: '!', texto: 'Risco médio', cls: 'risco-medio' },
+      alto:  { icone: '⚠', texto: 'Risco alto', cls: 'risco-alto' }
+    }[r.risco] || { icone: '!', texto: 'Risco médio', cls: 'risco-medio' };
+
+    var recomendacao = {
+      baixo: 'O risco calculado é baixo. Se ainda ficou em dúvida, confirme por outro canal antes de responder.',
+      medio: 'Não responda ainda. Confirme por um canal que você já conhece: o telefone do seu cartão ou o número salvo da pessoa.',
+      alto: 'Não responda, não clique e não pague. Confirme por outro canal e, se você já fez algo, veja o que fazer agora.'
+    }[r.risco];
+
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Resultado da verificação</h1>' +
+
+      '<div class="risco ' + cfg.cls + '">' +
+        '<span class="risco-icone" aria-hidden="true">' + cfg.icone + '</span>' +
+        '<span>' +
+          '<span class="risco-nivel">' + cfg.texto + '</span>' +
+          '<span class="risco-pontos">' + r.pontos + ' ponto(s) na soma dos sinais</span>' +
+        '</span>' +
+      '</div>' +
+
+      '<p class="recomendacao">' + esc(recomendacao) + '</p>' +
+
+      (r.risco === 'baixo'
+        ? '<div class="aviso-baixo">Risco baixo não garante que a comunicação é legítima. O resultado é só um apoio para a sua decisão.</div>'
+        : '') +
+
+      '<h2 class="secao-titulo">Sinais encontrados</h2>' +
+      (r.sinais.length === 0
+        ? '<p class="vazio">Nenhum sinal de alerta foi encontrado nas suas respostas.</p>'
+        : '<ul class="sinais-lista">' + r.sinais.map(function (s) {
+            return '<li><strong>' + esc(s.titulo) + '</strong><span>' + esc(s.curto) + '</span></li>';
+          }).join('') + '</ul>');
+
+    var acoes = '';
+    if (r.remetente === 'instituicao') {
+      acoes += '<button type="button" class="btn btn-primario" data-action="ir-confirmar-instituicao">Confirmar com a instituição</button>';
+    }
+    if (r.remetente === 'conhecida') {
+      acoes += '<button type="button" class="btn btn-primario" data-action="ir-confirmar-pessoa">Confirmar com a pessoa</button>';
+    }
+
+    var temConfirmacao = (r.remetente === 'instituicao' || r.remetente === 'conhecida');
+    acoes += '<button type="button" class="btn ' + (temConfirmacao ? 'btn-secundario' : 'btn-primario') + '" data-action="ir-oque-fazer">Ver o que fazer agora</button>';
+    acoes += '<button type="button" class="btn btn-neutro" data-action="entender-sinal">Entender um sinal</button>';
+    if (r.risco === 'baixo') {
+      acoes += '<button type="button" class="btn btn-neutro" data-action="encerrar">Encerrar</button>';
+    }
+
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- ENTENDER UM SINAL ---------- */
+  function telaEntenderSinal() {
+    var r = state.resultadoAtual;
+    var sinais = r && r.sinais ? r.sinais : [];
+
+    var conteudo = '<h1 class="titulo-tela">Entender um sinal</h1>' +
+      '<p class="ajuda">Explicação curta de cada sinal que apareceu no seu resultado.</p>';
+
+    if (sinais.length === 0) {
+      conteudo += '<p class="vazio">Nenhum sinal de alerta foi encontrado nesta verificação.</p>';
+    } else {
+      conteudo += sinais.map(function (s) {
+        return '<div class="sinal-detalhe"><h3>' + esc(s.titulo) + '</h3><p>' + esc(s.longo || s.curto) + '</p></div>';
+      }).join('');
+    }
+
+    var acoes = '<button type="button" class="btn btn-secundario" data-action="voltar">Voltar ao resultado</button>';
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- CONFIRMAR COM A INSTITUIÇÃO ---------- */
+  function telaConfirmarInstituicao() {
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Confirmar com a instituição</h1>' +
+      '<p class="ajuda">Procure a instituição pelo nome no diretório de exemplo e compare com o contato que te procurou.</p>' +
+
+      '<div class="campo">' +
+        '<label class="rotulo" for="campo-busca">Nome da instituição</label>' +
+        '<input type="text" id="campo-busca" data-field="busca" value="' + esc(state.buscaInst) + '" placeholder="Ex.: Banco Exemplo">' +
+      '</div>' +
+      '<button type="button" class="btn btn-secundario" data-action="buscar-inst">Buscar no diretório</button>';
+
+    if (state.buscaFeita) {
+      var termo = semAcento(state.buscaInst.trim());
+      var achadas = INSTITUICOES.filter(function (inst) {
+        return termo === '' || semAcento(inst.nome).indexOf(termo) !== -1;
+      });
+
+      if (achadas.length === 0) {
+        conteudo += '' +
+          '<div class="card" style="margin-top:16px">' +
+            '<h3>Instituição não encontrada</h3>' +
+            '<p>Não encontramos essa instituição no diretório de exemplo.</p>' +
+            '<p>Use o telefone impresso no seu cartão ou digite o site oficial você mesmo no navegador. Não use o telefone ou o link que veio na mensagem.</p>' +
+          '</div>';
+      } else if (!state.instSelecionada) {
+        conteudo += '<h2 class="secao-titulo">Resultados</h2><div class="opcoes">' +
+          achadas.map(function (inst) {
+            return '<button type="button" class="chip" data-action="selecionar-inst" data-id="' + inst.id + '">' + esc(inst.nome) + '</button>';
+          }).join('') + '</div>';
+      }
+    }
+
+    if (state.instSelecionada) {
+      var inst = state.instSelecionada;
+      var r = state.resultadoAtual;
+
+      conteudo += '' +
+        '<div class="card" style="margin-top:16px">' +
+          '<span class="etiqueta">Canais oficiais (exemplo fictício)</span>' +
+          '<h3>' + esc(inst.nome) + '</h3>' +
+          '<dl>' +
+            '<dt>Telefones</dt><dd>' + inst.telefones.map(esc).join(' · ') + '</dd>' +
+            '<dt>Site</dt><dd>' + esc(inst.site) + '</dd>' +
+            '<dt>Perfis verificados</dt><dd>' + inst.perfis.map(esc).join(' · ') + '</dd>' +
+            '<dt>Como a instituição costuma contatar</dt><dd>' + esc(inst.comoContata) + '</dd>' +
+          '</dl>' +
+        '</div>' +
+
+        '<div class="card">' +
+          '<h3>Comparar com o que chegou até você</h3>' +
+          '<dl>' +
+            '<dt>O que chegou</dt><dd>' + esc(r && r.conteudo ? r.conteudo : 'Não informado') + '</dd>' +
+            '<dt>Quem dizia ser</dt><dd>' + esc(r && r.remetente ? REMETENTES[r.remetente] : 'Não informado') + '</dd>' +
+            '<dt>Canal oficial para conferir</dt><dd>' + esc(inst.telefones[0]) + ' · ' + esc(inst.site) + '</dd>' +
+          '</dl>' +
+          '<p style="margin-top:10px">Compare o número ou o endereço que te procurou com os canais oficiais acima. Se for diferente, não responda por ali: procure a instituição pelo canal oficial.</p>' +
+        '</div>';
+    }
+
+    var acoes = '' +
+      '<button type="button" class="btn btn-primario" data-action="registrar-resultado" data-v="legitimo">Registrar: é legítimo</button>' +
+      '<button type="button" class="btn btn-perigo" data-action="registrar-resultado" data-v="golpe">Registrar: é golpe</button>' +
+      '<button type="button" class="btn btn-neutro" data-action="registrar-resultado" data-v="nao-confirmei">Registrar: não consegui confirmar</button>';
+
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- CONFIRMAR COM A PESSOA ---------- */
+  function telaConfirmarPessoa() {
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Confirmar com a pessoa</h1>' +
+      '<p class="ajuda">Confirme por um canal que você já conhece, e não pelo contato que acabou de te procurar.</p>' +
+
+      '<div class="card">' +
+        '<h3>1. Ligue para o número que você já tem salvo</h3>' +
+        '<p>Use o contato antigo, que já estava no seu celular antes dessa mensagem. Se a pessoa atender, você já sabe que é ela.</p>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>2. Não responda pelo número novo</h3>' +
+        '<p>Responder pelo número novo mantém você falando com quem enviou a mensagem, que pode não ser a pessoa de verdade.</p>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>3. Faça uma pergunta que só a pessoa saberia</h3>' +
+        '<p>Pergunte algo que não está na internet nem na conversa, como o nome de um professor antigo, um apelido de infância ou um combinado entre vocês.</p>' +
+      '</div>' +
+
+      '<div class="aviso-baixo">Se não conseguir falar com a pessoa pelo contato antigo, trate como não confirmado e não faça nenhum pagamento.</div>';
+
+    var acoes = '' +
+      '<button type="button" class="btn btn-primario" data-action="registrar-resultado" data-v="legitimo">Registrar: é legítimo</button>' +
+      '<button type="button" class="btn btn-perigo" data-action="registrar-resultado" data-v="golpe">Registrar: é golpe</button>' +
+      '<button type="button" class="btn btn-neutro" data-action="registrar-resultado" data-v="nao-confirmei">Registrar: não consegui confirmar</button>';
+
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- VER O QUE FAZER AGORA ---------- */
+  function telaOQueFazer() {
+    var sit = state.oQueFazer.situacao;
+    var atual = null;
+    SITUACOES.forEach(function (s) { if (s.id === sit) { atual = s; } });
+
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Ver o que fazer agora</h1>' +
+      '<div class="pausa">' +
+        '<span class="pausa-icone" aria-hidden="true">💬</span>' +
+        '<p><strong>Acontece com muita gente. Agir rápido é o que mais importa.</strong></p>' +
+      '</div>' +
+
+      '<div class="campo">' +
+        '<span class="rotulo">O que aconteceu?</span>' +
+        '<div class="opcoes">' +
+          SITUACOES.map(function (s) {
+            return '<button type="button" class="chip" data-action="set-situacao" data-v="' + s.id + '" aria-pressed="' + (sit === s.id) + '">' + esc(s.label) + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+
+    if (!atual) {
+      conteudo += '<p class="vazio">Escolha a situação acima para ver o passo a passo.</p>';
+    } else {
+      var concluidos = state.oQueFazer.concluidos;
+      var total = atual.passos.length;
+      var feitos = 0;
+      atual.passos.forEach(function (_, i) { if (concluidos[i]) { feitos++; } });
+
+      conteudo += '<h2 class="secao-titulo">Passo a passo</h2>' +
+        '<p class="contador" style="margin-top:0;margin-bottom:10px">' + feitos + ' de ' + total + ' passos concluídos</p>' +
+        atual.passos.map(function (p, i) {
+          var feito = !!concluidos[i];
+          return '<button type="button" class="passo" data-action="marcar-passo" data-i="' + i + '" aria-pressed="' + feito + '">' +
+            '<span class="caixa" aria-hidden="true">' + (feito ? '✓' : '') + '</span>' +
+            '<span class="texto">' + esc(p) + '</span>' +
+          '</button>';
+        }).join('') +
+
+        '<div class="acoes-linha">' +
+          '<button type="button" class="btn btn-secundario" data-action="ir-canais">Canais de ajuda</button>' +
+          '<button type="button" class="btn btn-secundario" data-action="ir-relatar">Relatar a tentativa</button>' +
+          '<button type="button" class="btn btn-secundario" data-action="ir-avisar">Avisar os contatos</button>' +
+        '</div>';
+    }
+
+    var acoes = '<button type="button" class="btn btn-primario" data-action="concluir-oque-fazer">Concluir</button>';
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- CANAIS DE AJUDA ---------- */
+  function telaCanaisAjuda() {
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Canais de ajuda</h1>' +
+      '<p class="ajuda">Guarde prints, comprovantes e o horário de tudo o que aconteceu. Isso ajuda em todos os canais abaixo.</p>' +
+
+      '<div class="card">' +
+        '<h3>Banco ou instituição</h3>' +
+        '<p>Ligue para o telefone que está impresso no seu cartão ou no site oficial digitado por você. Nunca use o telefone que veio na mensagem.</p>' +
+        '<dl>' +
+          '<dt>Contato de exemplo (fictício)</dt><dd>Banco Exemplo — 0800 000 0000</dd>' +
+          '<dt>O que ter em mãos</dt><dd>Prints da conversa, comprovante da transação e o horário em que tudo aconteceu.</dd>' +
+        '</dl>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>Devolução do Pix pelo MED</h3>' +
+        '<p>O MED é o Mecanismo Especial de Devolução do Pix. Você pede a devolução pelo seu banco, informando o Pix que fez. O banco avalia e pode devolver o valor.</p>' +
+        '<dl>' +
+          '<dt>Contato de exemplo (fictício)</dt><dd>Banco Exemplo — 0800 000 0000</dd>' +
+          '<dt>O que ter em mãos</dt><dd>Comprovante do Pix, horário da transação e os dados de quem recebeu, se você tiver.</dd>' +
+        '</dl>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<h3>Delegacia virtual</h3>' +
+        '<p>Você pode registrar o boletim de ocorrência pela delegacia virtual do seu estado, sem precisar ir presencialmente. Procure "delegacia virtual" junto com o nome do seu estado no navegador.</p>' +
+        '<dl>' +
+          '<dt>O que ter em mãos</dt><dd>Prints das mensagens, comprovantes, dados de quem recebeu o valor e o horário dos fatos.</dd>' +
+        '</dl>' +
+      '</div>';
+
+    return { conteudo: conteudo, acoes: '' };
+  }
+
+  /* ---------- RELATAR A TENTATIVA ---------- */
+  function telaRelatar() {
+    var r = state.resultadoAtual || state.rascunho || {};
+    var pedidosTexto = (r.pedidos && r.pedidos.length)
+      ? r.pedidos.map(function (p) {
+          for (var i = 0; i < PEDIDOS.length; i++) { if (PEDIDOS[i].id === p) { return PEDIDOS[i].label; } }
+          return p;
+        }).join(', ')
+      : 'Nenhum';
+
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Relatar a tentativa</h1>' +
+      '<p class="ajuda">Seu relato vira um alerta para outras pessoas. Ninguém vê quem relatou.</p>' +
+
+      '<div class="card">' +
+        '<span class="etiqueta">Preenchido com a sua verificação</span>' +
+        '<dl>' +
+          '<dt>Tipo</dt><dd>' + esc(TIPOS[r.tipo] || 'Não informado') + '</dd>' +
+          '<dt>Remetente</dt><dd>' + esc(REMETENTES[r.remetente] || 'Não informado') + '</dd>' +
+          '<dt>Pedido</dt><dd>' + esc(pedidosTexto) + '</dd>' +
+          '<dt>Texto</dt><dd>' + esc(r.conteudo || 'Não informado') + '</dd>' +
+        '</dl>' +
+      '</div>' +
+
+      '<div class="campo">' +
+        '<span class="rotulo">Como você quer relatar</span>' +
+        '<div class="opcoes">' +
+          '<button type="button" class="chip" data-action="set-anonimo" data-v="anonimo" aria-pressed="' + state.relato.anonimo + '">Anônimo</button>' +
+          '<button type="button" class="chip" data-action="set-anonimo" data-v="identificado" aria-pressed="' + (!state.relato.anonimo) + '">Identificado</button>' +
+        '</div>' +
+      '</div>' +
+
+      (state.relato.anonimo
+        ? '<p class="texto-pequeno">O relato é anônimo por padrão. Seus dados não aparecem para ninguém.</p>'
+        : '<div class="campo">' +
+            '<label class="rotulo" for="campo-ident">Nome ou contato para identificação</label>' +
+            '<input type="text" id="campo-ident" data-field="identificacao" value="' + esc(state.relato.identificacao) + '" placeholder="Como você quer ser identificado">' +
+          '</div>') +
+
+      '<div class="card">' +
+        '<h3>Recurso do protótipo: Simular falha de conexão</h3>' +
+        '<p class="texto-pequeno">Ligue esta opção para ver o que acontece quando o envio falha.</p>' +
+        '<button type="button" class="switch" data-action="toggle-falha" aria-pressed="' + state.relato.falha + '">' +
+          '<span class="marca-switch" aria-hidden="true"></span>' +
+          '<span>' + (state.relato.falha ? 'Falha de conexão ligada' : 'Falha de conexão desligada') + '</span>' +
+        '</button>' +
+      '</div>' +
+
+      (state.relato.status === 'enviado'
+        ? '<div class="status status-ok">Relato enviado. Obrigado por ajudar a alertar outras pessoas.</div>'
+        : '') +
+      (state.relato.status === 'salvo'
+        ? '<div class="status status-espera">Sem conexão agora. Seu relato foi salvo no celular e será enviado quando a conexão voltar.</div>'
+        : '');
+
+    var acoes = '<button type="button" class="btn btn-primario" data-action="enviar-relato">Enviar relato</button>';
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- AVISAR OS CONTATOS ---------- */
+  function telaAvisar() {
+    if (!state.avisoTexto) {
+      var r = state.resultadoAtual || {};
+      var quem = REMETENTES[r.remetente] || 'alguém';
+      state.avisoTexto = 'Atenção: recebi uma mensagem suspeita de ' + quem.toLowerCase() +
+        ' pedindo dados ou dinheiro. Não clique em links nem faça Pix sem confirmar por outro canal. ' +
+        'Se receber algo parecido, confira antes de responder.';
+    }
+
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Avisar os contatos</h1>' +
+      '<p class="ajuda">A mensagem abaixo está pronta. Você pode editar antes de compartilhar.</p>' +
+
+      '<div class="campo">' +
+        '<label class="rotulo" for="campo-aviso">Mensagem de alerta</label>' +
+        '<textarea id="campo-aviso" data-field="aviso">' + esc(state.avisoTexto) + '</textarea>' +
+      '</div>' +
+
+      (state.relato.avisoStatus === 'ok'
+        ? '<div class="status status-ok">Compartilhamento simulado. No celular, esta ação abriria o aplicativo de mensagens.</div>'
+        : '');
+
+    var acoes = '<button type="button" class="btn btn-primario" data-action="compartilhar-aviso">Compartilhar (simulado)</button>';
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* ---------- CONHECER OS SINAIS DE ALERTA ---------- */
+  function telaSinais() {
+    var conteudo = '' +
+      '<h1 class="titulo-tela">Conhecer os sinais de alerta</h1>' +
+      '<p class="ajuda">Toque em um tipo de golpe para ver como funciona, os sinais, um exemplo e como confirmar.</p>' +
+
+      TIPOS_DE_GOLPE.map(function (g) {
+        return '<details class="golpe">' +
+          '<summary>' + esc(g.titulo) + '</summary>' +
+          '<div class="corpo">' +
+            '<h4>Como funciona</h4><p>' + esc(g.comoFunciona) + '</p>' +
+            '<h4>Sinais</h4><p>' + esc(g.sinais) + '</p>' +
+            '<h4>Exemplo</h4><p>' + esc(g.exemplo) + '</p>' +
+            '<h4>Como confirmar</h4><p>' + esc(g.comoConfirmar) + '</p>' +
+          '</div>' +
+        '</details>';
+      }).join('');
+
+    var acoes = '<button type="button" class="btn btn-primario" data-action="nova-verificacao">Verificar uma comunicação</button>';
+    if (telaAnterior() === 'resultado') {
+      acoes += '<button type="button" class="btn btn-secundario" data-action="voltar">Voltar ao resultado</button>';
+    }
+
+    return { conteudo: conteudo, acoes: acoes };
+  }
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
+
+  var TELAS = {
+    'inicio': telaInicio,
+    'informar': telaInformar,
+    'perguntas': telaPerguntas,
+    'resultado': telaResultado,
+    'entender-sinal': telaEntenderSinal,
+    'confirmar-instituicao': telaConfirmarInstituicao,
+    'confirmar-pessoa': telaConfirmarPessoa,
+    'o-que-fazer': telaOQueFazer,
+    'canais-ajuda': telaCanaisAjuda,
+    'relatar': telaRelatar,
+    'avisar': telaAvisar,
+    'sinais': telaSinais
+  };
+
+  var ETAPAS = {
+    'informar': { n: 1, texto: 'Passo 1 de 3 · Informar a comunicação' },
+    'perguntas': { n: 2, texto: 'Passo 2 de 3 · Perguntas rápidas' },
+    'resultado': { n: 3, texto: 'Passo 3 de 3 · Resultado' }
+  };
+
+  function renderSubbar() {
+    var t = telaAtual();
+    var html = '';
+
+    if (pilha.length > 1) {
+      html += '<button type="button" class="voltar" data-action="voltar">← Voltar</button>';
+    }
+
+    if (ETAPAS[t]) {
+      var pct = Math.round((ETAPAS[t].n / 3) * 100);
+      html += '<div class="progresso">' +
+        '<div class="barra"><span style="width:' + pct + '%"></span></div>' +
+        '<span class="progresso-texto">' + ETAPAS[t].texto + '</span>' +
+      '</div>';
+    }
+
+    document.getElementById('subbar').innerHTML = html;
+  }
+
+  function render() {
+    var tela = telaAtual();
+    var fn = TELAS[tela] || TELAS.inicio;
+    var out = fn();
+
+    document.getElementById('tela').innerHTML = out.conteudo;
+    document.getElementById('acoes').innerHTML = out.acoes || '';
+    renderSubbar();
+  }
+
+  /* =========================================================
+     AÇÕES
+     ========================================================= */
+
+  function limparErro(campo) {
+    delete state.erros[campo];
+    var resumo = document.getElementById('resumo-erros');
+    if (resumo) { resumo.parentNode.removeChild(resumo); }
+  }
+
+  function validarInformar() {
+    var d = state.rascunho;
+    var e = {};
+
+    if (!d.tipo) { e.tipo = 'Escolha o tipo de comunicação.'; }
+    if (!d.conteudo || !d.conteudo.trim()) { e.conteudo = 'Informe o conteúdo da comunicação para continuar.'; }
+    if (!d.remetente) { e.remetente = 'Diga quem o remetente diz ser.'; }
+
+    state.erros = e;
+
+    if (Object.keys(e).length > 0) {
+      render();
+      window.scrollTo(0, 0);
+      return;
+    }
+    navegar('perguntas');
+  }
+
+  function verResultado() {
+    var d = state.rascunho;
+    var faltam = d.respostas.filter(function (r) { return !r; }).length;
+
+    if (faltam > 0) {
+      state.erroPerguntas = 'Responda as ' + faltam + ' pergunta(s) que faltam para ver o resultado.';
+      render();
+      return;
+    }
+
+    state.erroPerguntas = '';
+    var res = calcularResultado(d);
+
+    state.resultadoAtual = {
+      tipo: d.tipo,
+      conteudo: d.conteudo,
+      remetente: d.remetente,
+      pedidos: d.pedidos.slice(),
+      respostas: d.respostas.slice(),
+      pontos: res.pontos,
+      risco: res.risco,
+      sinais: res.sinais,
+      data: new Date().toISOString(),
+      salvo: false
+    };
+
+    navegar('resultado');
+  }
+
+  function registrarResultado(valor) {
+    var r = state.resultadoAtual;
+
+    if (valor === 'legitimo') {
+      if (r && !r.salvo) {
+        salvarNoHistorico(r, 'Confirmado: é legítimo');
+        r.salvo = true;
+      }
+      state.resultadoAtual = null;
+      state.rascunho = novoRascunho();
+      state.erros = {};
+      state.erroPerguntas = '';
+      state.oQueFazer = { situacao: '', concluidos: {} };
+      navegar('inicio', { limpar: true });
+      return;
+    }
+
+    if (r && !r.salvo) {
+      salvarNoHistorico(r, valor === 'golpe' ? 'Confirmado: é golpe' : 'Não consegui confirmar');
+      r.salvo = true;
+    }
+    state.oQueFazer = { situacao: '', concluidos: {} };
+    navegar('o-que-fazer', { substituir: true });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target.closest('[data-action]');
+    if (!el) { return; }
+    var a = el.getAttribute('data-action');
+
+    switch (a) {
+
+      case 'topo-inicio':
+        state.resultadoAtual = null;
+        navegar('inicio', { limpar: true });
+        break;
+
+      case 'topo-ajuda':
+        navegar('canais-ajuda');
+        break;
+
+      case 'voltar':
+        voltar();
+        break;
+
+      case 'nova-verificacao':
+        state.rascunho = novoRascunho();
+        state.erros = {};
+        state.erroPerguntas = '';
+        navegar('informar');
+        break;
+
+      case 'ja-cai':
+        state.resultadoAtual = null;
+        state.oQueFazer = { situacao: '', concluidos: {} };
+        navegar('o-que-fazer');
+        break;
+
+      case 'abrir-sinais':
+        navegar('sinais');
+        break;
+
+      case 'simular':
+        var ex = EXEMPLOS[el.getAttribute('data-exemplo')];
+        if (ex) {
+          state.rascunho = {
+            tipo: ex.tipo,
+            conteudo: ex.conteudo,
+            remetente: ex.remetente,
+            pedidos: ex.pedidos.slice(),
+            respostas: [null, null, null, null, null]
+          };
+          state.erros = {};
+          state.erroPerguntas = '';
+          navegar('informar');
+        }
+        break;
+
+      case 'abrir-historico':
+        var id = el.getAttribute('data-id');
+        var achado = null;
+        state.historico.forEach(function (item) { if (item.id === id) { achado = item; } });
+        if (achado) {
+          state.resultadoAtual = achado;
+          navegar('resultado');
+        }
+        break;
+
+      case 'set-tipo':
+        state.rascunho.tipo = el.getAttribute('data-v');
+        limparErro('tipo');
+        render();
+        break;
+
+      case 'set-remetente':
+        state.rascunho.remetente = el.getAttribute('data-v');
+        limparErro('remetente');
+        render();
+        break;
+
+      case 'toggle-pedido':
+        var p = el.getAttribute('data-pedido');
+        if (p === 'nenhum') {
+          state.rascunho.pedidos = [];
+        } else {
+          var idx = state.rascunho.pedidos.indexOf(p);
+          if (idx === -1) {
+            state.rascunho.pedidos.push(p);
+          } else {
+            state.rascunho.pedidos.splice(idx, 1);
+          }
+        }
+        render();
+        break;
+
+      case 'avancar-informar':
+        validarInformar();
+        break;
+
+      case 'resp':
+        var qi = parseInt(el.getAttribute('data-q'), 10);
+        state.rascunho.respostas[qi] = el.getAttribute('data-v');
+        state.erroPerguntas = '';
+        render();
+        break;
+
+      case 'ver-resultado':
+        verResultado();
+        break;
+
+      case 'ir-confirmar-instituicao':
+        state.buscaInst = '';
+        state.buscaFeita = false;
+        state.instSelecionada = null;
+        navegar('confirmar-instituicao');
+        break;
+
+      case 'ir-confirmar-pessoa':
+        navegar('confirmar-pessoa');
+        break;
+
+      case 'ir-oque-fazer':
+        state.oQueFazer = { situacao: '', concluidos: {} };
+        navegar('o-que-fazer');
+        break;
+
+      case 'entender-sinal':
+        navegar('entender-sinal');
+        break;
+
+      case 'encerrar':
+        concluir('Encerrado com risco baixo');
+        break;
+
+      case 'buscar-inst':
+        state.buscaFeita = true;
+        state.instSelecionada = null;
+        render();
+        break;
+
+      case 'selecionar-inst':
+        var iid = el.getAttribute('data-id');
+        INSTITUICOES.forEach(function (inst) {
+          if (inst.id === iid) { state.instSelecionada = inst; }
+        });
+        render();
+        break;
+
+      case 'registrar-resultado':
+        registrarResultado(el.getAttribute('data-v'));
+        break;
+
+      case 'set-situacao':
+        state.oQueFazer = { situacao: el.getAttribute('data-v'), concluidos: {} };
+        render();
+        break;
+
+      case 'marcar-passo':
+        var pi = el.getAttribute('data-i');
+        if (state.oQueFazer.concluidos[pi]) {
+          delete state.oQueFazer.concluidos[pi];
+        } else {
+          state.oQueFazer.concluidos[pi] = true;
+        }
+        render();
+        break;
+
+      case 'ir-canais':
+        navegar('canais-ajuda');
+        break;
+
+      case 'ir-relatar':
+        state.relato.status = null;
+        navegar('relatar');
+        break;
+
+      case 'ir-avisar':
+        state.relato.avisoStatus = null;
+        navegar('avisar');
+        break;
+
+      case 'concluir-oque-fazer':
+        concluir('O que fazer agora concluído');
+        break;
+
+      case 'set-anonimo':
+        state.relato.anonimo = (el.getAttribute('data-v') === 'anonimo');
+        render();
+        break;
+
+      case 'toggle-falha':
+        state.relato.falha = !state.relato.falha;
+        state.relato.status = null;
+        render();
+        break;
+
+      case 'enviar-relato':
+        state.relato.status = state.relato.falha ? 'salvo' : 'enviado';
+        render();
+        break;
+
+      case 'compartilhar-aviso':
+        state.relato.avisoStatus = 'ok';
+        render();
+        break;
+
+      default:
+        break;
+    }
+  });
+
+  document.addEventListener('input', function (ev) {
+    var t = ev.target;
+    var campo = t.getAttribute('data-field');
+    if (!campo) { return; }
+
+    if (campo === 'conteudo') {
+      state.rascunho.conteudo = t.value;
+      if (state.erros.conteudo) {
+        limparErro('conteudo');
+        t.classList.remove('invalido');
+        var pai = t.parentNode;
+        var msg = pai.querySelector('.erro');
+        if (msg) { pai.removeChild(msg); }
+      }
+    } else if (campo === 'aviso') {
+      state.avisoTexto = t.value;
+    } else if (campo === 'identificacao') {
+      state.relato.identificacao = t.value;
+    } else if (campo === 'busca') {
+      state.buscaInst = t.value;
+    }
+  });
+
+  /* ---------- início ---------- */
+  render();
+
+})();
+</script>
+</body>
+</html>

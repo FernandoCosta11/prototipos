@@ -1,0 +1,2959 @@
+<!DOCTYPE html>
+<!--
+  CONFERE AÍ · protótipo interativo (trabalho de Interação Humano-Computador)
+
+  Arquivo único com HTML, CSS e JavaScript. Não há back-end, biblioteca externa nem chamada de rede.
+  Todos os dados ficam em memória: recarregar a página apaga tudo.
+  Instituições, telefones, sites e perfis são fictícios e servem só de exemplo.
+
+  Decisões tomadas onde o enunciado deixava margem:
+
+  SUPOSIÇÃO: "dados em memória" (seção 2) vale sobre qualquer persistência. Não uso localStorage, então o histórico some ao recarregar a página. "Manter os dados no dispositivo" (RNF05) é atendido porque nada sai do navegador.
+  SUPOSIÇÃO: o tipo de comunicação começa em "Mensagem", porque o RF04 só bloqueia o avanço por falta de conteúdo ou de remetente.
+  SUPOSIÇÃO: deixar "O que está sendo pedido" sem marcação equivale a "Nenhum" (0 ponto). Marcar "Nenhum" desmarca os demais, e marcar qualquer outro desmarca "Nenhum".
+  SUPOSIÇÃO: para o tipo "Arquivo", o conteúdo é o nome do arquivo ou o texto que veio com ele. Não há envio de arquivo.
+  SUPOSIÇÃO: o compartilhamento simulado (RF02) preenche só tipo e conteúdo, como faria um compartilhamento real. O remetente e o pedido dos exemplos da seção 7 aparecem descritos no controle de simulação e são escolhidos pelo usuário.
+  SUPOSIÇÃO: "Perguntas rápidas" é uma tela única que mostra uma pergunta por vez. Tocar na resposta já avança, e a quinta resposta abre o Resultado sem botão extra (RNF01 e RNF08).
+  SUPOSIÇÃO: a resposta "não sei" entra na lista de sinais como ponto de dúvida, porque soma ponto e o RNF09 pede que o nível venha sempre com o que o justifica.
+  SUPOSIÇÃO: com mais de um pedido, todos aparecem na lista de sinais, mas só o de maior pontuação entra na soma (seção 4). O detalhe da soma fica em "Como este resultado foi calculado".
+  SUPOSIÇÃO: "Entender um sinal" abre a tela "Conhecer os sinais de alerta" com o tipo de golpe mais parecido já aberto. Quem chega pelo Resultado vê "Voltar ao resultado"; quem chega pelo Início vê "Verificar uma comunicação".
+  SUPOSIÇÃO: o encerramento não tem tela própria. Ele salva a verificação, volta ao Início e mostra um aviso de confirmação (seção 5).
+  SUPOSIÇÃO: no histórico, "resultado" é o nível de risco. Se houver confirmação registrada, ela aparece junto.
+  SUPOSIÇÃO: uma verificação salva reabre no Resultado com as mesmas ações. Encerrar ou concluir de novo atualiza o mesmo item, sem duplicar, e as respostas originais não podem ser alteradas.
+  SUPOSIÇÃO: só "Encerrar", "É legítimo" e "Concluir" salvam (RF17). Sair para o Início no meio de uma verificação descarta o que não foi salvo. O botão Voltar preserva tudo (RNF06).
+  SUPOSIÇÃO: "Concluir" no caminho "Já caí ou quase caí" não cria item no histórico, porque não existe verificação a salvar (RF12).
+  SUPOSIÇÃO: o RF03 não coleta o número ou endereço do remetente, então a comparação do RF08 pede que o usuário digite o contato recebido (telefone, e-mail, site ou perfil).
+  SUPOSIÇÃO: se o texto informado cita uma instituição do diretório, a busca do RF08 já vem com esse nome preenchido. O usuário pode trocar.
+  SUPOSIÇÃO: o RF13 pede contato fictício em cada canal e a seção 2 pede para não inventar contatos do MED e da delegacia virtual. O MED mostra o contato fictício do banco (é ao banco que se pede a devolução) e a delegacia virtual mostra um endereço ".example", marcado como exemplo.
+  SUPOSIÇÃO: sites usam o final ".example" e telefones usam 0800 000 0000 ou DDD 00, formatos que não existem de verdade.
+  SUPOSIÇÃO: como não há cadastro (RNF05), o relato "identificado" pede apenas o nome. Relato que falhou fica salvo e só é reenviado quando o usuário toca em "Tentar enviar agora" (envio só por ação explícita).
+  SUPOSIÇÃO: "Início" e "Pedir ajuda agora" ficam em uma barra fixa no rodapé, e as ações de cada tela ficam logo acima dela. O botão Voltar fica oculto no Início, que não tem tela anterior.
+  SUPOSIÇÃO: o progresso (RNF07) cobre os três passos da verificação: Informar, Perguntas e Resultado.
+  SUPOSIÇÃO: os passos de "Ver o que fazer agora" são marcados só pelo usuário. Enviar o relato ou compartilhar o aviso não marca o passo sozinho.
+-->
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0E5A58">
+  <title>Início · Confere Aí</title>
+  <!-- Ícone vazio: evita que o navegador peça /favicon.ico pela rede. -->
+  <link rel="icon" href="data:,">
+
+  <style>
+    /* ==========================================================================
+       1. Identidade visual (cores com contraste de texto de pelo menos 4,5:1)
+       ========================================================================== */
+    :root {
+      --palco: #D9D5CB;          /* fundo fora do aplicativo, em telas grandes */
+      --fundo: #F6F4EF;          /* fundo do aplicativo */
+      --superficie: #FFFFFF;     /* cartões, campos e rodapé de ações */
+      --tinta: #17212B;          /* texto principal */
+      --tinta-suave: #44505D;    /* texto de apoio */
+      --linha: #DDD9CF;          /* divisórias decorativas */
+      --borda: #6B7582;          /* contorno de campos e opções (3:1 ou mais) */
+      --marca: #0E5A58;          /* cor da marca e das ações principais */
+      --marca-forte: #0A4544;
+      --marca-suave: #E1F0EE;
+      --barra: #14202B;          /* barra fixa de atalhos */
+      --foco: #0B4FD1;
+      --foco-escuro: #FFD866;
+
+      --baixo-fundo: #E4F3E7; --baixo-borda: #1F7A3D; --baixo-tinta: #124A25;
+      --medio-fundo: #FFF1CC; --medio-borda: #96580A; --medio-tinta: #5C3600;
+      --alto-fundo: #FCE6E3;  --alto-borda: #B3261E;  --alto-tinta: #7A1712;
+
+      --erro: #A1201A;
+      --erro-fundo: #FDECEA;
+
+      /* Roxo reservado aos recursos que só existem no protótipo. */
+      --proto-fundo: #F0EDFA; --proto-borda: #5B4BB5; --proto-tinta: #3A2E85;
+
+      --raio: 16px;
+      --sombra: 0 1px 2px rgba(23, 33, 43, .06), 0 4px 12px rgba(23, 33, 43, .05);
+    }
+
+    /* ==========================================================================
+       2. Base
+       ========================================================================== */
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    html {
+      height: 100%;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      height: 100%;
+      margin: 0;
+      background: var(--palco);
+      color: var(--tinta);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 1.0625rem; /* 17 px: acima do mínimo de 16 px do RNF04 */
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    h1, h2, h3, p, ul, ol, dl, dd, dt, fieldset, legend, blockquote { margin: 0; padding: 0; }
+    ul, ol { list-style: none; }
+    fieldset { min-width: 0; border: 0; }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    strong { font-weight: 700; }
+
+    :focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+    h1:focus, h2:focus, p:focus { outline: none; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      margin: -1px; padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .icone {
+      flex: none;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ==========================================================================
+       3. Moldura do aplicativo (retrato, 360 a 430 px)
+       ========================================================================== */
+    .app {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 430px;
+      height: 100vh;
+      height: 100dvh;
+      margin: 0 auto;
+      overflow: hidden;
+      background: var(--fundo);
+    }
+
+    /* Em telas maiores, o aplicativo fica centralizado em uma área com largura de celular. */
+    @media (min-width: 500px) {
+      body { display: flex; align-items: center; justify-content: center; }
+      .app {
+        height: min(100vh - 2rem, 900px);
+        height: min(100dvh - 2rem, 900px);
+        border-radius: 28px;
+        box-shadow: 0 24px 60px rgba(20, 32, 43, .28), 0 0 0 1px rgba(20, 32, 43, .1);
+      }
+    }
+
+    .topo {
+      flex: none;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      min-height: 56px;
+      padding: 0 .5rem;
+      background: var(--superficie);
+      border-bottom: 1px solid var(--linha);
+    }
+    .topo__voltar {
+      justify-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: .125rem;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 .75rem 0 .25rem;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--marca);
+      font-weight: 600;
+    }
+    .topo__voltar:hover { background: var(--marca-suave); }
+    .topo__marca {
+      grid-column: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: .375rem;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      color: var(--marca);
+    }
+
+    .progresso {
+      flex: none;
+      padding: .625rem 1rem .5rem;
+      background: var(--superficie);
+      border-bottom: 1px solid var(--linha);
+    }
+    .progresso__trilha { display: grid; grid-template-columns: repeat(3, 1fr); gap: .375rem; }
+    .progresso__trilha li {
+      display: flex;
+      align-items: center;
+      gap: .25rem;
+      padding-top: .375rem;
+      border-top: 4px solid #C9C5BB;
+      color: var(--tinta-suave);
+      font-size: 1rem;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
+    .progresso__trilha .feito { border-top-color: var(--marca); color: var(--marca); }
+    .progresso__trilha .atual { border-top: 6px solid var(--marca); padding-top: calc(.375rem - 2px); color: var(--tinta); font-weight: 700; }
+
+    .tela { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+    .conteudo {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 1.25rem 1rem 1.5rem;
+    }
+    .conteudo > * + * { margin-top: 1rem; }
+    .conteudo--entrando { animation: entrar .22s ease-out; }
+    @keyframes entrar {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    /* Rodapé de ações: as ações principais ficam sempre na parte de baixo (RNF02). */
+    .acoes {
+      flex: none;
+      display: grid;
+      gap: .5rem;
+      padding: .75rem 1rem;
+      background: var(--superficie);
+      border-top: 1px solid var(--linha);
+      box-shadow: 0 -6px 16px rgba(20, 32, 43, .06);
+    }
+    .acoes__rotulo { color: var(--tinta-suave); font-size: 1rem; line-height: 1.3; }
+    .acoes__grupo { display: grid; gap: .5rem; }
+    .acoes__dupla { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .acoes__trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+
+    /* Barra fixa: "Início" e "Pedir ajuda agora" na mesma posição em todas as telas (RF18, RNF07). */
+    .barra {
+      flex: none;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .5rem;
+      padding: .5rem .75rem calc(.5rem + env(safe-area-inset-bottom, 0px));
+      background: var(--barra);
+    }
+    .barra__botao {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      min-height: 48px;
+      padding: .25rem .625rem;
+      border: 2px solid transparent;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .barra__botao:focus-visible { outline-color: var(--foco-escuro); }
+    .barra__botao--inicio { min-width: 6rem; background: transparent; color: #FFFFFF; border-color: rgba(255, 255, 255, .45); }
+    .barra__botao--inicio[aria-current="page"] { background: rgba(255, 255, 255, .16); border-color: #FFFFFF; }
+    .barra__botao--ajuda { background: #FFFFFF; color: var(--tinta); }
+    .barra__botao--ajuda .icone { color: var(--alto-borda); }
+    .barra__botao--ajuda[aria-current="page"] { box-shadow: inset 0 -4px 0 var(--alto-borda); }
+
+    /* ==========================================================================
+       4. Componentes
+       ========================================================================== */
+    .titulo { font-size: 1.5rem; line-height: 1.2; font-weight: 800; letter-spacing: -.015em; }
+    .titulo--menor { font-size: 1.125rem; color: var(--tinta-suave); font-weight: 700; letter-spacing: 0; }
+    .subtitulo { font-size: 1.1875rem; line-height: 1.25; font-weight: 800; letter-spacing: -.01em; }
+    .rotulo-secao { font-size: 1.0625rem; font-weight: 700; }
+    .intro { color: var(--tinta-suave); }
+    .dica { color: var(--tinta-suave); font-size: 1rem; line-height: 1.4; }
+    .secao { display: grid; gap: .625rem; }
+
+    .botao {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      width: 100%;
+      min-height: 52px;
+      padding: .5rem 1rem;
+      border: 2px solid transparent;
+      border-radius: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+      text-align: center;
+    }
+    .botao--principal { background: var(--marca); color: #FFFFFF; }
+    .botao--principal:hover { background: var(--marca-forte); }
+    .botao--secundario { min-height: 48px; background: var(--superficie); color: var(--marca); border-color: var(--marca); }
+    .botao--secundario:hover { background: var(--marca-suave); }
+    .botao--secundario[aria-pressed="true"] { background: var(--marca-suave); box-shadow: inset 0 0 0 1px var(--marca); }
+    .botao--texto { min-height: 48px; background: transparent; color: var(--marca); text-decoration: underline; text-underline-offset: 3px; }
+    .botao--mini { width: auto; min-height: 44px; padding: .375rem .875rem; background: var(--superficie); color: var(--marca); border-color: var(--marca); font-weight: 600; }
+    .botao--entrada { justify-content: flex-start; text-align: left; }
+    .botao--entrada .seta { margin-left: auto; }
+    .botao--resposta { flex-direction: column; gap: .125rem; min-height: 64px; padding: .375rem .25rem; }
+    .botao--proto { justify-content: flex-start; min-height: 56px; background: #FFFFFF; color: var(--proto-tinta); border-color: var(--proto-borda); text-align: left; font-weight: 400; }
+    .botao--proto strong { display: block; }
+
+    .cartao {
+      display: grid;
+      gap: .75rem;
+      padding: 1rem;
+      background: var(--superficie);
+      border: 1px solid var(--linha);
+      border-radius: var(--raio);
+      box-shadow: var(--sombra);
+    }
+
+    .etiqueta {
+      display: inline-flex;
+      align-items: center;
+      gap: .375rem;
+      justify-self: start;
+      padding: .125rem .625rem;
+      border-radius: 10px;
+      background: var(--marca-suave);
+      color: var(--marca-forte);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    /* Avisos: sempre com ícone e texto, nunca só com cor. */
+    .aviso {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .75rem;
+      align-items: start;
+      padding: .875rem 1rem;
+      border: 1px solid;
+      border-radius: 14px;
+    }
+    .aviso > .icone { margin-top: .125rem; }
+    .aviso p + p { margin-top: .375rem; }
+    .aviso--info { background: var(--marca-suave); border-color: var(--marca); color: var(--tinta); }
+    .aviso--info > .icone { color: var(--marca); }
+    .aviso--sucesso { background: var(--baixo-fundo); border-color: var(--baixo-borda); color: var(--baixo-tinta); }
+    .aviso--alerta { background: var(--medio-fundo); border-color: var(--medio-borda); color: var(--medio-tinta); }
+    .aviso--erro { background: var(--alto-fundo); border-color: var(--alto-borda); color: var(--alto-tinta); }
+
+    /* Campos de formulário: rótulo sempre visível (RNF04). */
+    .campo { display: grid; gap: .375rem; }
+    .rotulo { font-weight: 700; }
+    .entrada {
+      display: block;
+      width: 100%;
+      min-height: 48px;
+      padding: .625rem .75rem;
+      background: #FFFFFF;
+      border: 1px solid var(--borda);
+      border-radius: 12px;
+      line-height: 1.45;
+    }
+    textarea.entrada { min-height: 8.5rem; resize: vertical; }
+    select.entrada { appearance: auto; }
+    .entrada[aria-invalid="true"] { border-color: var(--erro); box-shadow: inset 0 0 0 1px var(--erro); background: var(--erro-fundo); }
+    .erro {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .5rem;
+      align-items: start;
+      color: var(--erro);
+      font-weight: 600;
+      line-height: 1.35;
+    }
+    .busca { position: relative; }
+    .busca .icone { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); color: var(--tinta-suave); pointer-events: none; }
+    .busca .entrada { padding-left: 2.75rem; }
+
+    /* Opções de escolha (rádio e caixa de seleção nativos, dentro de uma área de toque grande). */
+    .grupo { display: grid; gap: .5rem; }
+    .grupo legend { margin-bottom: .125rem; font-weight: 700; }
+    .opcoes { display: grid; gap: .5rem; }
+    .opcoes--duas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .opcao {
+      display: flex;
+      align-items: center;
+      gap: .625rem;
+      min-height: 52px;
+      padding: .5rem .75rem;
+      background: var(--superficie);
+      border: 1px solid var(--borda);
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .opcao input { flex: none; width: 1.375rem; height: 1.375rem; margin: 0; accent-color: var(--marca); cursor: pointer; }
+    .opcao--marcada { background: var(--marca-suave); border-color: var(--marca); box-shadow: inset 0 0 0 1px var(--marca); }
+    .opcao__texto { display: grid; min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
+    .opcao__rotulo { font-weight: 600; }
+    .opcao__dica { color: var(--tinta-suave); font-size: 1rem; }
+    .opcao:focus-within { outline: 3px solid var(--foco); outline-offset: 2px; }
+    .opcao input:focus-visible { outline: none; }
+    @supports selector(:has(*)) {
+      .opcao:focus-within { outline: none; }
+      .opcao:has(input:focus-visible) { outline: 3px solid var(--foco); outline-offset: 2px; }
+    }
+
+    /* Escolhas que navegam (botões em forma de linha). */
+    .escolhas { display: grid; gap: .5rem; }
+    .escolha {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: .75rem;
+      width: 100%;
+      min-height: 60px;
+      padding: .625rem .75rem;
+      background: var(--superficie);
+      border: 1px solid var(--borda);
+      border-radius: 14px;
+      text-align: left;
+    }
+    .escolha--sem-icone { grid-template-columns: 1fr auto; }
+    .escolha:hover { border-color: var(--marca); background: var(--marca-suave); }
+    .escolha__icone { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--marca-suave); color: var(--marca); }
+    .escolha__texto { display: grid; line-height: 1.3; }
+    .escolha__texto span { color: var(--tinta-suave); font-size: 1rem; }
+    .escolha > .icone:last-child { color: var(--tinta-suave); }
+
+    /* Recursos que só existem no protótipo. */
+    .prototipo {
+      display: grid;
+      gap: .625rem;
+      padding: .875rem;
+      background: var(--proto-fundo);
+      border: 2px dashed var(--proto-borda);
+      border-radius: var(--raio);
+      color: var(--tinta);
+    }
+    .prototipo__selo { display: inline-flex; align-items: center; gap: .375rem; color: var(--proto-tinta); font-size: 1rem; font-weight: 700; }
+    .prototipo .opcao { border-color: var(--proto-borda); }
+    .prototipo .opcao input { accent-color: var(--proto-borda); }
+    .prototipo .opcao--marcada { background: #FFFFFF; border-color: var(--proto-borda); box-shadow: inset 0 0 0 1px var(--proto-borda); }
+
+    /* Sanfonas (details nativo). */
+    .sanfona { background: var(--superficie); border: 1px solid var(--linha); border-radius: 14px; box-shadow: var(--sombra); }
+    .sanfona > summary {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      min-height: 56px;
+      padding: .625rem 1rem;
+      border-radius: 14px;
+      font-weight: 700;
+      line-height: 1.3;
+      cursor: pointer;
+      list-style: none;
+    }
+    .sanfona > summary::-webkit-details-marker { display: none; }
+    .sanfona > summary h2 { font-size: inherit; font-weight: inherit; }
+    .sanfona > summary .seta { margin-left: auto; color: var(--tinta-suave); transition: transform .15s ease; }
+    .sanfona[open] > summary .seta { transform: rotate(180deg); }
+    .sanfona__titulo { display: grid; gap: .25rem; justify-items: start; }
+    .sanfona__corpo { display: grid; gap: .875rem; padding: .25rem 1rem 1rem; }
+    .sanfona__corpo h3 { margin-bottom: .25rem; font-size: 1rem; font-weight: 700; color: var(--marca-forte); }
+
+    .citacao {
+      padding: .75rem .875rem;
+      background: var(--fundo);
+      border-left: 4px solid var(--marca);
+      border-radius: 0 12px 12px 0;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .citacao--rolavel { max-height: 8.5em; overflow-y: auto; }
+
+    .inteiro { white-space: nowrap; }
+
+    .lista-marcada { display: grid; gap: .375rem; }
+    .lista-marcada li { display: grid; grid-template-columns: auto 1fr; gap: .5rem; align-items: start; }
+    .lista-marcada .icone { margin-top: .2rem; color: var(--marca); }
+
+    .resumo { display: grid; gap: .625rem; }
+    .resumo dt { color: var(--tinta-suave); font-size: 1rem; }
+    .resumo dd { font-weight: 600; overflow-wrap: anywhere; }
+    .resumo dd.citacao { font-weight: 400; }
+
+    /* ---------- Início ---------- */
+    .pausa {
+      position: relative;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.125rem 1rem;
+      border-radius: 20px;
+      background: var(--marca);
+      color: #FFFFFF;
+      overflow: hidden;
+    }
+    .pausa__respiro { position: relative; display: grid; place-items: center; width: 56px; height: 56px; }
+    .pausa__respiro::before, .pausa__respiro::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, .55);
+      animation: respirar 5s ease-in-out infinite;
+    }
+    .pausa__respiro::after { inset: 8px; background: rgba(255, 255, 255, .14); animation-delay: -.6s; }
+    @keyframes respirar {
+      0%, 100% { transform: scale(.86); opacity: .65; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+    .pausa__texto { font-size: 1.125rem; line-height: 1.35; }
+    .pausa__texto strong { display: block; font-size: 1.375rem; font-weight: 800; letter-spacing: -.01em; }
+
+    .vazio {
+      display: grid;
+      justify-items: center;
+      gap: .375rem;
+      padding: 1.25rem 1rem;
+      border: 1px dashed var(--borda);
+      border-radius: var(--raio);
+      color: var(--tinta-suave);
+      text-align: center;
+    }
+    .vazio strong { color: var(--tinta); }
+
+    .historico { display: grid; gap: .5rem; }
+    .historico__item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: .75rem;
+      width: 100%;
+      min-height: 64px;
+      padding: .625rem .75rem;
+      background: var(--superficie);
+      border: 1px solid var(--borda);
+      border-radius: 14px;
+      text-align: left;
+    }
+    .historico__item:hover { border-color: var(--marca); }
+    .historico__texto { display: grid; line-height: 1.3; }
+    .historico__texto span { color: var(--tinta-suave); font-size: 1rem; }
+    .historico__item > .icone:last-child { color: var(--tinta-suave); }
+
+    .selo { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 2px solid; }
+    .selo--baixo { background: var(--baixo-fundo); border-color: var(--baixo-borda); color: var(--baixo-borda); }
+    .selo--medio { background: var(--medio-fundo); border-color: var(--medio-borda); color: var(--medio-borda); }
+    .selo--alto { background: var(--alto-fundo); border-color: var(--alto-borda); color: var(--alto-borda); }
+
+    /* ---------- Perguntas rápidas ---------- */
+    .pergunta { display: grid; justify-items: start; gap: .625rem; padding: 1.25rem 1rem; background: var(--superficie); border: 1px solid var(--linha); border-radius: 20px; box-shadow: var(--sombra); }
+    .pergunta__conta { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; color: var(--tinta-suave); font-weight: 600; }
+    .pergunta__pontos { display: inline-flex; gap: .375rem; }
+    .pergunta__pontos li { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--borda); }
+    .pergunta__pontos .feito { background: var(--marca); border-color: var(--marca); }
+    .pergunta__pontos .atual { border-color: var(--marca); box-shadow: 0 0 0 3px var(--marca-suave); }
+    .pergunta__icone { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--marca-suave); color: var(--marca); }
+    .pergunta__texto { font-size: 1.625rem; line-height: 1.2; font-weight: 800; letter-spacing: -.015em; }
+    .pergunta__ajuda { color: var(--tinta-suave); }
+
+    /* ---------- Resultado ---------- */
+    .risco { display: grid; gap: .875rem; padding: 1.125rem 1rem; border: 2px solid; border-radius: 20px; }
+    .risco--baixo { background: var(--baixo-fundo); border-color: var(--baixo-borda); color: var(--baixo-tinta); }
+    .risco--medio { background: var(--medio-fundo); border-color: var(--medio-borda); color: var(--medio-tinta); }
+    .risco--alto { background: var(--alto-fundo); border-color: var(--alto-borda); color: var(--alto-tinta); }
+    .risco__topo { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .875rem; }
+    .risco__icone { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: #FFFFFF; border: 2px solid currentColor; }
+    .risco__rotulo { font-size: 1rem; font-weight: 600; }
+    .risco__nivel { font-size: 1.875rem; line-height: 1.1; font-weight: 800; letter-spacing: -.02em; }
+    .risco__apoio { font-size: 1rem; line-height: 1.4; }
+
+    .medidor { display: grid; grid-template-columns: repeat(3, 1fr); gap: .375rem; }
+    .medidor li { display: grid; gap: .25rem; font-size: 1rem; text-align: center; opacity: .8; }
+    .medidor li::before { content: ""; height: 6px; border-radius: 3px; border: 1px solid currentColor; }
+    .medidor .medidor__atual { font-weight: 800; opacity: 1; }
+    .medidor .medidor__atual::before { height: 12px; margin-top: -3px; border-radius: 6px; background: currentColor; }
+
+    .sinais { display: grid; gap: .5rem; }
+    .sinal { display: grid; grid-template-columns: auto 1fr; gap: .75rem; padding: .875rem; background: var(--superficie); border: 1px solid var(--linha); border-radius: 14px; box-shadow: var(--sombra); }
+    .sinal__icone { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--marca-suave); color: var(--marca); }
+    .sinal--duvida { border-style: dashed; border-color: var(--borda); box-shadow: none; }
+    .sinal--duvida .sinal__icone { background: #ECEEF1; color: var(--tinta-suave); }
+    .sinal__titulo { font-weight: 700; line-height: 1.3; }
+    .sinal__explicacao { color: var(--tinta-suave); font-size: 1rem; line-height: 1.4; }
+
+    .proximo { display: grid; grid-template-columns: auto 1fr; gap: .75rem; padding: 1rem; background: var(--superficie); border: 2px solid var(--marca); border-radius: var(--raio); }
+    .proximo > .icone { margin-top: .125rem; color: var(--marca); }
+
+    .conta { display: grid; gap: .375rem; }
+    .conta li { display: flex; justify-content: space-between; gap: 1rem; }
+    .conta strong { flex: none; }
+    .conta__total { padding-top: .5rem; border-top: 1px solid var(--linha); font-weight: 700; }
+
+    /* ---------- Confirmações ---------- */
+    .canais { display: grid; gap: .75rem; }
+    .canais dt { display: flex; align-items: center; gap: .5rem; font-weight: 700; }
+    .canais dt .icone { color: var(--marca); }
+    .canais dd { padding-left: 1.875rem; }
+    .comparar { display: grid; gap: .5rem; padding-top: .875rem; border-top: 1px solid var(--linha); }
+
+    .orientacoes { display: grid; gap: .625rem; counter-reset: orientacao; }
+    .orientacao { display: grid; grid-template-columns: auto 1fr; gap: .75rem; padding: 1rem; background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio); box-shadow: var(--sombra); }
+    .orientacao::before {
+      counter-increment: orientacao;
+      content: counter(orientacao);
+      display: grid;
+      place-items: center;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--marca);
+      color: #FFFFFF;
+      font-weight: 800;
+    }
+    .orientacao strong { display: block; line-height: 1.3; }
+    .orientacao span { color: var(--tinta-suave); }
+
+    /* ---------- Ver o que fazer agora ---------- */
+    .acolhimento { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .875rem; padding: 1rem; border-radius: 20px; background: var(--marca); color: #FFFFFF; font-size: 1.125rem; font-weight: 600; line-height: 1.35; }
+    .situacao-escolhida { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .625rem .75rem .625rem 1rem; background: var(--marca-suave); border: 1px solid var(--marca); border-radius: 14px; }
+    .situacao-escolhida p { display: grid; line-height: 1.3; }
+
+    .checklist { display: grid; gap: .5rem; }
+    .passo { display: grid; gap: .5rem; padding: .25rem .25rem .625rem; background: var(--superficie); border: 1px solid var(--borda); border-radius: 14px; }
+    .passo--feito { background: var(--baixo-fundo); border-color: var(--baixo-borda); }
+    .passo__marca { display: grid; grid-template-columns: auto 1fr; gap: .75rem; align-items: start; min-height: 48px; padding: .625rem .5rem 0 .625rem; cursor: pointer; }
+    .passo__marca input { width: 1.625rem; height: 1.625rem; margin: .0625rem 0 0; accent-color: var(--baixo-borda); cursor: pointer; }
+    .passo__texto { display: grid; gap: .125rem; line-height: 1.35; }
+    .passo__texto span { color: var(--tinta-suave); font-size: 1rem; }
+    .passo--feito .passo__texto strong { text-decoration: line-through; text-decoration-thickness: 1px; }
+    .passo--feito .passo__texto span { color: var(--baixo-tinta); }
+    .passo .botao--mini { justify-self: start; margin-left: 3rem; }
+
+    /* ---------- Canais de ajuda ---------- */
+    .canal__topo { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .75rem; }
+    .canal__icone { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--marca-suave); color: var(--marca); }
+    .canal__contato { display: grid; gap: .125rem; padding: .75rem; background: var(--fundo); border-radius: 12px; }
+    .canal__contato strong { font-size: 1.1875rem; }
+
+    /* ---------- Conhecer os sinais de alerta ---------- */
+    .golpe__icone { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--marca-suave); color: var(--marca); flex: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Ícones desenhados no próprio arquivo: nenhum recurso externo é carregado. -->
+  <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="i-marca" viewBox="0 0 24 24"><path d="M4 4.5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1Z"/><path d="m8.3 10.6 2.5 2.5 4.9-5.2"/></symbol>
+    <symbol id="i-casa" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></symbol>
+    <symbol id="i-ajuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="m5.6 5.6 3.9 3.9m5 5 3.9 3.9m0-12.8-3.9 3.9m-5 5-3.9 3.9"/></symbol>
+    <symbol id="i-seta-esq" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-seta-dir" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-seta-baixo" viewBox="0 0 24 24"><path d="m5 9 7 7 7-7"/></symbol>
+    <symbol id="i-lupa" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></symbol>
+    <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 8 7.5 9.5 4.4-1.5 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m8.8 12 2.4 2.4 4.2-4.6"/></symbol>
+    <symbol id="i-circulo-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8 5.4-5.6"/></symbol>
+    <symbol id="i-triangulo" viewBox="0 0 24 24"><path d="M12 3.5 2.5 20h19L12 3.5Z"/><path d="M12 10v4.5"/><path d="M12 17.2v.3"/></symbol>
+    <symbol id="i-octogono" viewBox="0 0 24 24"><path d="M8.2 2.8h7.6l5.4 5.4v7.6l-5.4 5.4H8.2l-5.4-5.4V8.2l5.4-5.4Z"/><path d="M12 7.5V13"/><path d="M12 16.2v.3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-interrogacao" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.8"/><path d="M12 17.1v.3"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.4v.3"/></symbol>
+    <symbol id="i-telefone" viewBox="0 0 24 24"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 6.5 6.5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A17.5 17.5 0 0 1 4.5 5.2 2 2 0 0 1 6.5 3Z"/></symbol>
+    <symbol id="i-globo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3Z"/></symbol>
+    <symbol id="i-arroba" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a2.5 2.5 0 0 0 5 0v-1a9 9 0 1 0-3.5 7.1"/></symbol>
+    <symbol id="i-mensagem" viewBox="0 0 24 24"><path d="M4 4.5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1v-10a1 1 0 0 1 1-1Z"/><path d="M8 9h8M8 12.5h5"/></symbol>
+    <symbol id="i-pessoa" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+    <symbol id="i-predio" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 10h4a1 1 0 0 1 1 1v10"/><path d="M2.5 21h19"/><path d="M8 8h3M8 12h3M8 16h3"/></symbol>
+    <symbol id="i-pessoa-duvida" viewBox="0 0 24 24"><circle cx="10" cy="8" r="4"/><path d="M3 20.5a7 7 0 0 1 10.5-6"/><path d="M16.8 13a2 2 0 0 1 3.9.7c0 1.3-1.9 1.6-1.9 2.9"/><path d="M18.8 19.8v.3"/></symbol>
+    <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
+    <symbol id="i-cadeado" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-presente" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/><path d="M12 8v13"/><path d="M12 8C10.8 5 9 3.5 7.5 3.5a2.25 2.25 0 0 0 0 4.5H12Zm0 0c1.2-3 3-4.5 4.5-4.5a2.25 2.25 0 0 1 0 4.5H12Z"/></symbol>
+    <symbol id="i-documento" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.8 16a3 3 0 0 1 5.4 0"/><path d="M14 10h4M14 14h4"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></symbol>
+    <symbol id="i-arquivo" viewBox="0 0 24 24"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-dinheiro" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><path d="M6 9.5v5M18 9.5v5"/></symbol>
+    <symbol id="i-codigo" viewBox="0 0 24 24"><rect x="3" y="7.5" width="18" height="9" rx="2"/><path d="M7.5 12v.2M12 12v.2M16.5 12v.2"/></symbol>
+    <symbol id="i-compartilhar" viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4.1M8.2 13.2l7.6 4.1"/></symbol>
+    <symbol id="i-enviar" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5"/><path d="M21 3 14.5 21l-4-7.5L3 9.5 21 3Z"/></symbol>
+    <symbol id="i-sem-sinal" viewBox="0 0 24 24"><path d="m3 3 18 18"/><path d="M8.5 16a5 5 0 0 1 7 0"/><path d="M5 12.5a10 10 0 0 1 3.5-2.3"/><path d="M14.5 10.3a10 10 0 0 1 4.5 2.2"/><path d="M2 9a15 15 0 0 1 4-2.8"/><path d="M10.5 5.1A15 15 0 0 1 22 9"/><path d="M12 19.5v.2"/></symbol>
+    <symbol id="i-pausa" viewBox="0 0 24 24"><path d="M9.5 8v8M14.5 8v8"/></symbol>
+    <symbol id="i-coracao" viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2Z"/></symbol>
+    <symbol id="i-livro" viewBox="0 0 24 24"><path d="M12 6.5C10.5 5 8.3 4.3 4 4.5v13.8c4.3-.2 6.5.5 8 2 1.5-1.5 3.7-2.2 8-2V4.5c-4.3-.2-6.5.5-8 2Z"/><path d="M12 6.5v13.8"/></symbol>
+    <symbol id="i-bandeira" viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4.5c5-2.5 7 2.5 13 0v9c-6 2.5-8-2.5-13 0"/></symbol>
+    <symbol id="i-pessoas" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></symbol>
+    <symbol id="i-cartao" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19"/><path d="M6 15h4"/></symbol>
+    <symbol id="i-frasco" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v6l-5.2 9a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 9V3"/><path d="M7.5 15h9"/></symbol>
+    <symbol id="i-caixa" viewBox="0 0 24 24"><path d="M3 13.5 5.5 5h13L21 13.5V19a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5.5Z"/><path d="M3 13.5h5l1.2 2.5h5.6l1.2-2.5h5"/></symbol>
+  </svg>
+
+  <div class="app" id="app" data-tela="inicio">
+    <header class="topo">
+      <button type="button" class="topo__voltar" id="btn-voltar" data-acao="voltar" hidden>
+        <svg class="icone" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-seta-esq"/></svg>
+        <span>Voltar</span>
+      </button>
+      <p class="topo__marca">
+        <svg class="icone" width="24" height="24" aria-hidden="true" focusable="false"><use href="#i-marca"/></svg>
+        <span>Confere Aí</span>
+      </p>
+    </header>
+
+    <nav class="progresso" id="progresso" aria-label="Progresso da verificação" hidden></nav>
+
+    <main class="tela">
+      <div class="conteudo" id="conteudo"></div>
+      <div class="acoes" id="acoes"></div>
+    </main>
+
+    <nav class="barra" aria-label="Atalhos fixos">
+      <button type="button" class="barra__botao barra__botao--inicio" id="btn-inicio" data-acao="inicio">
+        <svg class="icone" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-casa"/></svg>
+        <span>Início</span>
+      </button>
+      <button type="button" class="barra__botao barra__botao--ajuda" id="btn-ajuda" data-acao="ajuda">
+        <svg class="icone" width="22" height="22" aria-hidden="true" focusable="false"><use href="#i-ajuda"/></svg>
+        <span>Pedir ajuda agora</span>
+      </button>
+    </nav>
+
+    <p class="sr-only" id="anuncio" aria-live="polite"></p>
+  </div>
+
+  <noscript>
+    <p style="max-width:430px;margin:2rem auto;padding:1rem;background:#fff;border-radius:16px">
+      O protótipo do Confere Aí precisa de JavaScript para funcionar. Ative o JavaScript no navegador e recarregue a página.
+    </p>
+  </noscript>
+
+  <script>
+  /*
+   * Organização do código (SOLID dentro de um arquivo só):
+   *   1. Dados fixos         conteúdo do protótipo, sem lógica
+   *   2. Utilitários         funções puras de texto e data
+   *   3. Risco               regra de cálculo da seção 4 (pura, sem DOM)
+   *   4. Sinais              tradução das respostas em sinais e recomendação (pura)
+   *   5. Comparador          comparação de contato com canais oficiais (pura)
+   *   6. Estado              dados em memória e operações sobre eles
+   *   7. Interface           moldura, foco e anúncios para leitor de tela
+   *   8. Telas               uma função de montagem por tela
+   *   9. Navegação           pilha de telas, voltar e encerrar
+   *  10. Ações e campos      resposta a toques e a mudanças de campo
+   *  11. Partida
+   *
+   * Exceção consciente: o enunciado exige um único arquivo, então os módulos são
+   * seções deste script em vez de arquivos separados. Cada seção mantém uma só
+   * responsabilidade, e novas telas ou ações entram como novas entradas nos mapas
+   * TELAS, ACOES e CAMPOS, sem alterar a moldura.
+   */
+  (function () {
+    'use strict';
+
+    /* ========================================================================
+     * 0. Tipos
+     * ====================================================================== */
+
+    /** @typedef {'mensagem'|'ligacao'|'email'|'link'|'arquivo'} TipoComunicacao */
+    /** @typedef {'pessoa'|'instituicao'|'desconhecido'} Remetente */
+    /** @typedef {'pix'|'codigo'|'dados'|'link'|'arquivo'|'nenhum'} Pedido */
+    /** @typedef {'sim'|'nao'|'naosei'} Resposta */
+    /** @typedef {'baixo'|'medio'|'alto'} NivelRisco */
+    /** @typedef {'legitimo'|'golpe'|'nao_confirmado'} Confirmacao */
+
+    /**
+     * Resultado do cálculo de risco, com as parcelas que o explicam.
+     * @typedef {Object} ResultadoRisco
+     * @property {number} perguntas  Pontos somados nas perguntas rápidas.
+     * @property {number} pedido     Pontos do pedido de maior peso.
+     * @property {number} remetente  Ponto do remetente desconhecido.
+     * @property {number} total      Soma das três parcelas.
+     * @property {NivelRisco} nivel  Faixa em que o total cai.
+     */
+
+    /**
+     * Estado da tela "Confirmar com a instituição" dentro de uma verificação.
+     * @typedef {Object} BuscaInstituicao
+     * @property {boolean} iniciada      Se a busca já recebeu o valor inicial.
+     * @property {string} busca          Texto digitado no campo de busca.
+     * @property {?string} selecionada   Id da instituição aberta.
+     * @property {string} contato        Contato recebido que o usuário quer comparar.
+     * @property {?Object} comparacao    Último resultado de comparação.
+     */
+
+    /**
+     * Uma verificação de comunicação, do preenchimento ao resultado.
+     * @typedef {Object} Verificacao
+     * @property {number} id
+     * @property {?Date} data                 Momento em que o resultado foi calculado.
+     * @property {boolean} salva              Se já está no histórico.
+     * @property {?string} origem             Aplicativo de onde veio o compartilhamento simulado.
+     * @property {TipoComunicacao} tipo
+     * @property {string} conteudo
+     * @property {?Remetente} remetente
+     * @property {Pedido[]} pedidos
+     * @property {Array<?Resposta>} respostas Uma resposta por pergunta rápida.
+     * @property {number} perguntaAtual       Índice da pergunta em exibição.
+     * @property {?ResultadoRisco} risco
+     * @property {?Confirmacao} confirmacao
+     * @property {Object<string, boolean>} erros  Campos com erro de validação.
+     * @property {BuscaInstituicao} inst
+     */
+
+    /**
+     * Relato da tentativa (RF14).
+     * @typedef {Object} Relato
+     * @property {boolean} iniciado   Se já foi preenchido com os dados da verificação.
+     * @property {TipoComunicacao} tipo
+     * @property {string} remetente   Id do remetente ou texto vazio.
+     * @property {Pedido[]} pedidos
+     * @property {string} texto
+     * @property {boolean} identificado
+     * @property {string} nome
+     * @property {'rascunho'|'pendente'|'enviado'} envio
+     * @property {number} tentativas
+     * @property {Object<string, boolean>} erros
+     */
+
+    /**
+     * Sessão de uso: uma verificação (opcional) e tudo o que vem depois dela.
+     * No caminho "Já caí ou quase caí" a sessão existe sem verificação.
+     * @typedef {Object} Sessao
+     * @property {?Verificacao} verificacao
+     * @property {{situacao: ?string, marcados: Object<string, boolean[]>}} ajuda
+     * @property {Relato} relato
+     * @property {{texto: string, compartilhado: boolean, erro: boolean}} aviso
+     */
+
+    /* ========================================================================
+     * 1. Dados fixos
+     * ====================================================================== */
+
+    /** Tipos de comunicação e os textos do campo de conteúdo para cada um. */
+    const TIPOS = [
+      { id: 'mensagem', rotulo: 'Mensagem', campo: 'Texto da mensagem',
+        dica: 'Cole ou digite o texto que você recebeu.',
+        falta: 'Falta o texto da mensagem. Cole ou digite o que você recebeu para continuar.' },
+      { id: 'ligacao', rotulo: 'Ligação', campo: 'Descrição da ligação',
+        dica: 'Conte quem ligou, o que falou e o que pediu.',
+        falta: 'Falta a descrição da ligação. Escreva em poucas palavras o que foi dito e o que foi pedido.' },
+      { id: 'email', rotulo: 'E-mail', campo: 'Texto do e-mail',
+        dica: 'Cole ou digite o texto do e-mail.',
+        falta: 'Falta o texto do e-mail. Cole ou digite o que você recebeu para continuar.' },
+      { id: 'link', rotulo: 'Link', campo: 'Link recebido',
+        dica: 'Cole o endereço do link. Não precisa abrir o link para copiar.',
+        falta: 'Falta o link. Cole aqui o endereço que você recebeu, sem abrir.' },
+      { id: 'arquivo', rotulo: 'Arquivo', campo: 'Nome do arquivo ou texto que veio com ele',
+        dica: 'Não abra o arquivo. Escreva o nome dele ou o texto que veio junto.',
+        falta: 'Falta o nome do arquivo ou o texto que veio com ele. Escreva sem abrir o arquivo.' },
+    ];
+
+    /** Quem o remetente diz ser. */
+    const REMETENTES = [
+      { id: 'pessoa', rotulo: 'Pessoa conhecida', dica: 'Parente, amigo, colega ou cliente' },
+      { id: 'instituicao', rotulo: 'Instituição', dica: 'Banco, loja, operadora ou órgão público' },
+      { id: 'desconhecido', rotulo: 'Desconhecido', dica: 'Não diz quem é ou você não conhece' },
+    ];
+
+    /** O que está sendo pedido, com a pontuação da seção 4 e o sinal correspondente. */
+    const PEDIDOS = [
+      { id: 'pix', rotulo: 'Pix ou pagamento', pontos: 2, icone: 'dinheiro',
+        sinal: 'Pede Pix ou pagamento',
+        explicacao: 'Depois que o dinheiro sai, é difícil trazer de volta.' },
+      { id: 'codigo', rotulo: 'Código', pontos: 3, icone: 'codigo',
+        sinal: 'Pede código',
+        explicacao: 'O código é a chave da sua conta. Quem recebe o código consegue entrar no seu lugar.' },
+      { id: 'dados', rotulo: 'Dados pessoais', pontos: 3, icone: 'documento',
+        sinal: 'Pede dados pessoais',
+        explicacao: 'Com seus dados, outra pessoa pode abrir contas ou fazer compras no seu nome.' },
+      { id: 'link', rotulo: 'Link', pontos: 1, icone: 'link',
+        sinal: 'Pede para abrir um link',
+        explicacao: 'O link pode levar a uma página falsa, feita para copiar seus dados.' },
+      { id: 'arquivo', rotulo: 'Arquivo', pontos: 1, icone: 'arquivo',
+        sinal: 'Pede para abrir um arquivo',
+        explicacao: 'O arquivo pode instalar um programa que copia suas informações.' },
+      { id: 'nenhum', rotulo: 'Nenhum', pontos: 0, icone: 'check', sinal: '', explicacao: '' },
+    ];
+
+    /** As cinco perguntas rápidas do RF05, na ordem do enunciado. */
+    const PERGUNTAS = [
+      { id: 'pressa', texto: 'Pede pressa?', icone: 'relogio',
+        ajuda: 'Fala em prazo curto, "urgente", "é para hoje" ou ameaça bloquear algo em minutos.',
+        sinal: 'Pede pressa',
+        explicacao: 'A pressa serve para você não ter tempo de pensar nem de conferir.',
+        duvida: 'Não deu para saber se pede pressa' },
+      { id: 'segredo', texto: 'Pede segredo?', icone: 'cadeado',
+        ajuda: 'Pede para você não contar a ninguém, não desligar ou não falar com o gerente.',
+        sinal: 'Pede segredo',
+        explicacao: 'Quem pede segredo quer evitar que alguém avise você.',
+        duvida: 'Não deu para saber se pede segredo' },
+      { id: 'novo', texto: 'O remetente é um número ou endereço novo?', icone: 'pessoa-duvida',
+        ajuda: 'Um número, e-mail ou perfil que você não tinha salvo ou nunca viu.',
+        sinal: 'Número ou endereço novo',
+        explicacao: 'É fácil criar um número ou perfil novo com o nome e a foto de outra pessoa ou empresa.',
+        duvida: 'Não deu para saber se o número ou endereço é novo' },
+      { id: 'oferta', texto: 'A oferta é boa demais?', icone: 'presente',
+        ajuda: 'Prêmio, desconto, vaga ou ganho fácil que parece bom demais para ser verdade.',
+        sinal: 'Oferta boa demais',
+        explicacao: 'Promessa de ganho fácil costuma ser isca para pedir dinheiro ou dados depois.',
+        duvida: 'Não deu para saber se a oferta é boa demais' },
+      { id: 'dados', texto: 'Usa seus dados pessoais?', icone: 'documento',
+        ajuda: 'Cita seu nome, CPF, endereço ou outro dado seu para parecer confiável.',
+        sinal: 'Usa seus dados pessoais',
+        explicacao: 'Dados vazam e circulam. Saber seu nome ou CPF não prova quem a pessoa é.',
+        duvida: 'Não deu para saber se usa seus dados pessoais' },
+    ];
+
+    /** Respostas possíveis para cada pergunta rápida. */
+    const RESPOSTAS = [
+      { id: 'sim', rotulo: 'Sim', icone: 'check' },
+      { id: 'nao', rotulo: 'Não', icone: 'x' },
+      { id: 'naosei', rotulo: 'Não sei', icone: 'interrogacao' },
+    ];
+
+    /** Explicação única para os pontos de dúvida ("não sei"). */
+    const EXPLICACAO_DUVIDA = 'Você respondeu "não sei". Na dúvida, conta como ponto de atenção.';
+
+    /** Sinal gerado quando o remetente é desconhecido. */
+    const SINAL_DESCONHECIDO = {
+      icone: 'pessoa-duvida',
+      titulo: 'Remetente desconhecido',
+      explicacao: 'Você não tem como saber quem está do outro lado.',
+    };
+
+    /** Textos e ícones de cada nível de risco. Cada nível tem uma forma de ícone própria. */
+    const NIVEIS = {
+      baixo: { titulo: 'Risco baixo', curto: 'Baixo', icone: 'circulo-check',
+        resumo: 'Encontramos poucos ou nenhum sinal de alerta no que você informou.' },
+      medio: { titulo: 'Risco médio', curto: 'Médio', icone: 'triangulo',
+        resumo: 'Encontramos alguns sinais de alerta. Confirme antes de fazer o que foi pedido.' },
+      alto: { titulo: 'Risco alto', curto: 'Alto', icone: 'octogono',
+        resumo: 'Encontramos vários sinais comuns em golpes. Não faça o que foi pedido antes de confirmar.' },
+    };
+
+    /** Recomendação de próximo passo por nível de risco e por remetente. */
+    const RECOMENDACOES = {
+      alto: {
+        instituicao: 'Não informe nada e não faça nenhum pagamento. Confirme com a instituição por um canal oficial que você mesmo procurou.',
+        pessoa: 'Não envie dinheiro nem código. Antes, ligue para o número que você já tinha salvo e confirme com a pessoa.',
+        desconhecido: 'Não responda, não toque em nada e não pague. Veja o que fazer agora para se proteger.',
+      },
+      medio: {
+        instituicao: 'Antes de fazer o que foi pedido, confirme com a instituição por um canal oficial que você mesmo procurou.',
+        pessoa: 'Antes de fazer o que foi pedido, confirme com a pessoa pelo número que você já tinha salvo.',
+        desconhecido: 'Não faça o que foi pedido sem ter certeza de quem está falando. Veja o que fazer agora.',
+      },
+      baixo: {
+        instituicao: 'Você pode encerrar. Se ainda tiver dúvida, confirme com a instituição antes de fazer o que foi pedido.',
+        pessoa: 'Você pode encerrar. Se ainda tiver dúvida, confirme com a pessoa antes de fazer o que foi pedido.',
+        desconhecido: 'Você pode encerrar. Se algo parecer estranho, não faça o que foi pedido.',
+      },
+    };
+
+    /** Resultados possíveis de uma confirmação por outro canal (RF10). */
+    const CONFIRMACOES = [
+      { id: 'legitimo', rotulo: 'É legítimo', curto: 'legítimo', icone: 'check' },
+      { id: 'golpe', rotulo: 'É golpe', curto: 'golpe', icone: 'triangulo' },
+      { id: 'nao_confirmado', rotulo: 'Não consegui confirmar', curto: 'não consegui confirmar', icone: 'interrogacao' },
+    ];
+
+    /** Diretório de instituições. Todos os nomes e contatos são fictícios. */
+    const INSTITUICOES = [
+      { id: 'banco', nome: 'Banco Exemplo', ramo: 'Banco',
+        telefones: [
+          { rotulo: 'Central de atendimento', valor: '0800 000 0000' },
+          { rotulo: 'WhatsApp oficial', valor: '(00) 90000-0000' },
+        ],
+        site: 'www.bancoexemplo.example',
+        perfis: ['@bancoexemplo'],
+        costume: 'Avisa pelo aplicativo do banco. Só liga quando você pede. Nunca pede senha, código recebido por SMS nem transferência para "conta segura".' },
+      { id: 'loja', nome: 'Loja Exemplo', ramo: 'Loja on-line',
+        telefones: [
+          { rotulo: 'Atendimento ao cliente', valor: '(00) 3000-0001' },
+          { rotulo: 'WhatsApp oficial', valor: '(00) 90000-0001' },
+        ],
+        site: 'www.lojaexemplo.example',
+        perfis: ['@lojaexemplo'],
+        costume: 'Avisa sobre pedidos por e-mail e dentro do aplicativo da loja. Não cobra taxa extra por mensagem para liberar entrega.' },
+      { id: 'operadora', nome: 'Operadora Exemplo', ramo: 'Telefonia e internet',
+        telefones: [
+          { rotulo: 'Central de atendimento', valor: '(00) 3000-0002' },
+          { rotulo: 'WhatsApp oficial', valor: '(00) 90000-0002' },
+        ],
+        site: 'www.operadoraexemplo.example',
+        perfis: ['@operadoraexemplo'],
+        costume: 'Envia a fatura pelo aplicativo e pelo e-mail cadastrado. Não pede código de confirmação por ligação.' },
+    ];
+
+    /** Tipos de golpe da tela "Conhecer os sinais de alerta" (RF16). */
+    const GOLPES = [
+      { id: 'parente', nome: 'Falso parente ou amigo', icone: 'pessoa',
+        como: 'Alguém escreve de um número novo dizendo ser um parente, amigo ou colega. Depois de uma conversa curta, pede dinheiro emprestado ou um Pix urgente.',
+        sinais: [
+          'Número novo com o nome ou a foto de quem você conhece',
+          'Frases como "troquei de número, salva esse"',
+          'Pedido de Pix para pagar algo ainda hoje',
+          'Conta do Pix em nome de outra pessoa',
+          'Evita ligação de voz ou de vídeo',
+        ],
+        exemplo: 'Oi, sou eu. Troquei de chip, salva esse número. Consegue fazer um Pix pra mim hoje? Te devolvo amanhã.',
+        confirmar: 'Ligue para o número que você já tinha salvo. Faça uma pergunta que só a pessoa saberia responder. Não responda pelo número novo antes disso.' },
+      { id: 'central', nome: 'Falsa central do banco', icone: 'predio',
+        como: 'Alguém liga ou manda mensagem dizendo ser do banco. Fala de uma compra ou de um acesso estranho e pede um código, uma senha ou uma transferência para "proteger" a conta.',
+        sinais: [
+          'Diz que a conta será bloqueada em minutos',
+          'Pede o código que chegou por SMS, a senha ou os dados do cartão',
+          'Pede para você não desligar',
+          'Pede transferência para uma "conta segura"',
+          'Já sabe seu nome e parte dos seus dados',
+        ],
+        exemplo: 'Banco Exemplo: identificamos atividade suspeita. Sua conta será bloqueada em 30 minutos. Informe ao atendente o código que você vai receber por SMS.',
+        confirmar: 'Desligue ou pare de responder. Ligue você para o telefone impresso no seu cartão ou use o aplicativo oficial do banco. Banco não pede senha nem código por ligação ou mensagem.' },
+      { id: 'cobranca', nome: 'Falsa cobrança', icone: 'dinheiro',
+        como: 'Chega um boleto, um Pix ou um link de pagamento de uma conta, taxa, multa ou dívida. A cobrança não existe ou os dados de pagamento foram trocados.',
+        sinais: [
+          'Cobrança que você não esperava',
+          'Ameaça de corte, multa ou nome negativado se não pagar hoje',
+          'Quem recebe o pagamento tem nome diferente do da empresa',
+          'Desconto alto para pagar agora',
+          'Link para "atualizar o boleto"',
+        ],
+        exemplo: 'Loja Exemplo: sua encomenda está parada. Pague hoje a taxa de R$ 14,90 pelo link para liberar a entrega.',
+        confirmar: 'Abra o aplicativo ou o site oficial digitando o endereço você mesmo e veja se a cobrança existe. Antes de pagar, confira o nome de quem vai receber.' },
+      { id: 'vaga', nome: 'Falsa vaga ou promoção', icone: 'presente',
+        como: 'Oferecem emprego fácil, prêmio ou desconto muito alto. Para "garantir", pedem um pagamento adiantado, seus dados ou que você toque em um link.',
+        sinais: [
+          'Ganho alto para pouco trabalho',
+          'Taxa de cadastro, curso ou material para começar',
+          'Prêmio de sorteio em que você não se inscreveu',
+          'Oferta que só vale nas próximas horas',
+          'Contato por número ou perfil que não é o oficial da empresa',
+        ],
+        exemplo: 'Parabéns! Você foi selecionado para trabalhar de casa e ganhar R$ 500 por dia. Pague a taxa de cadastro de R$ 49 para garantir sua vaga.',
+        confirmar: 'Procure a empresa pelos canais oficiais e pergunte se a vaga ou a promoção existe. Vaga de verdade não cobra para contratar.' },
+    ];
+
+    /** Rótulos dos botões que levam do passo a passo às telas de apoio. */
+    const ROTULOS_APOIO = {
+      canais: 'Abrir canais de ajuda',
+      relatar: 'Relatar a tentativa',
+      avisar: 'Avisar os contatos',
+    };
+
+    /** Situações e passo a passo da tela "Ver o que fazer agora" (RF11). */
+    const SITUACOES = [
+      { id: 'nao-interagi', rotulo: 'Não interagi', dica: 'Não respondi, não cliquei e não paguei',
+        passos: [
+          { titulo: 'Não responda e não toque em nada', detalhe: 'Você não precisa responder para se proteger.' },
+          { titulo: 'Guarde um print da conversa', detalhe: 'Ele ajuda se você quiser relatar a tentativa.' },
+          { titulo: 'Bloqueie o número ou o remetente', detalhe: 'Assim a pessoa não consegue insistir.' },
+          { titulo: 'Se usaram o nome de uma empresa, avise a empresa', detalhe: 'Use o canal oficial, não o contato que veio na mensagem.', apoio: 'canais' },
+          { titulo: 'Relate a tentativa', detalhe: 'Seu relato vira alerta para outras pessoas.', apoio: 'relatar' },
+          { titulo: 'Avise seus contatos', detalhe: 'Principalmente se usaram o nome de alguém que você conhece.', apoio: 'avisar' },
+        ] },
+      { id: 'cliquei', rotulo: 'Cliquei no link', dica: 'Abri o link ou baixei um arquivo',
+        passos: [
+          { titulo: 'Feche a página e não preencha nada', detalhe: 'Se a página pediu dados ou senha, não informe.' },
+          { titulo: 'Não abra o que foi baixado', detalhe: 'Se um arquivo ou aplicativo foi baixado, apague sem abrir.' },
+          { titulo: 'Troque suas senhas mais importantes', detalhe: 'Comece pelo e-mail e pelo banco. Troque direto no aplicativo ou no site oficial.' },
+          { titulo: 'Acompanhe o extrato do banco', detalhe: 'Nos próximos dias, veja se aparece algo que você não reconhece. Se aparecer, fale com o banco.', apoio: 'canais' },
+          { titulo: 'Relate a tentativa', detalhe: 'Seu relato vira alerta para outras pessoas.', apoio: 'relatar' },
+          { titulo: 'Avise seus contatos', detalhe: 'O mesmo link pode chegar para eles.', apoio: 'avisar' },
+        ] },
+      { id: 'informei', rotulo: 'Informei dados ou código', dica: 'Passei senha, código, CPF ou dados do cartão',
+        passos: [
+          { titulo: 'Fale agora com o banco ou a instituição', detalhe: 'Peça o bloqueio da conta, do cartão ou do acesso. Use o canal oficial.', apoio: 'canais' },
+          { titulo: 'Troque as senhas', detalhe: 'Troque direto no aplicativo ou no site oficial, começando pela conta que foi exposta.' },
+          { titulo: 'Se passou o código do WhatsApp, recupere a conta', detalhe: 'Abra o WhatsApp, entre com o seu número e peça um novo código. Depois, ative a confirmação em duas etapas.' },
+          { titulo: 'Registre um boletim de ocorrência', detalhe: 'Dá para fazer pela delegacia virtual, sem sair de casa.', apoio: 'canais' },
+          { titulo: 'Avise seus contatos', detalhe: 'Podem usar o seu nome para pedir dinheiro a eles.', apoio: 'avisar' },
+          { titulo: 'Relate a tentativa', detalhe: 'Seu relato vira alerta para outras pessoas.', apoio: 'relatar' },
+        ] },
+      { id: 'paguei', rotulo: 'Paguei', dica: 'Fiz Pix, transferência ou paguei boleto',
+        passos: [
+          { titulo: 'Fale agora com o seu banco e peça a devolução', detalhe: 'Se pagou por Pix, peça a devolução pelo Mecanismo Especial de Devolução (MED). Quanto antes você pedir, maior a chance de recuperar o valor.', apoio: 'canais' },
+          { titulo: 'Guarde o comprovante e os prints', detalhe: 'Anote também o dia e o horário do pagamento.' },
+          { titulo: 'Registre um boletim de ocorrência', detalhe: 'Dá para fazer pela delegacia virtual. O banco pode pedir o número do boletim.', apoio: 'canais' },
+          { titulo: 'Não faça novos pagamentos', detalhe: 'Desconfie de quem cobrar uma taxa para "liberar" o dinheiro de volta.' },
+          { titulo: 'Avise seus contatos', detalhe: 'Podem tentar o mesmo golpe com eles.', apoio: 'avisar' },
+          { titulo: 'Relate a tentativa', detalhe: 'Seu relato vira alerta para outras pessoas.', apoio: 'relatar' },
+        ] },
+    ];
+
+    /** Canais de ajuda (RF13). Contatos fictícios, identificados como exemplo. */
+    const CANAIS_AJUDA = [
+      { id: 'banco', nome: 'Banco ou instituição', icone: 'predio',
+        para: 'Para bloquear conta, cartão ou acesso e avisar sobre o golpe.',
+        contato: { rotulo: 'Banco Exemplo', valor: '0800 000 0000' },
+        nota: 'No aplicativo real, aparece aqui o contato da sua instituição. O telefone também fica impresso no cartão.',
+        emMaos: ['Prints da conversa ou da ligação', 'Dia e horário do contato', 'Número, e-mail ou perfil de quem falou com você'] },
+      { id: 'med', nome: 'Devolução do Pix pelo MED', icone: 'dinheiro',
+        para: 'O Mecanismo Especial de Devolução (MED) é pedido ao banco de onde saiu o Pix. O banco pode bloquear o valor na conta de quem recebeu.',
+        contato: { rotulo: 'Central do Banco Exemplo', valor: '0800 000 0000' },
+        nota: 'O pedido é feito no seu próprio banco, pelo aplicativo ou pela central. Peça o quanto antes: as chances caem com o tempo.',
+        emMaos: ['Comprovante do Pix', 'Dia e horário do pagamento', 'Prints da conversa'] },
+      { id: 'delegacia', nome: 'Delegacia virtual', icone: 'escudo',
+        para: 'Para registrar o boletim de ocorrência pela internet, sem sair de casa.',
+        contato: { rotulo: 'Delegacia virtual do seu estado', valor: 'www.delegaciavirtual.example' },
+        nota: 'Endereço de exemplo. No aplicativo real, aparece aqui o endereço da delegacia virtual do seu estado.',
+        emMaos: ['Prints da conversa', 'Comprovante do pagamento, se houver', 'Dia e horário do que aconteceu', 'Seu documento de identidade'] },
+    ];
+
+    /** Exemplos da seção 7, usados pelo controle "Simular compartilhamento". */
+    const EXEMPLOS = {
+      A: { titulo: 'Exemplo A', resumo: 'mensagem de WhatsApp',
+        gabarito: 'Diz ser pessoa conhecida e pede Pix',
+        origem: 'WhatsApp', tipo: 'mensagem',
+        conteudo: 'Oi Lari, sou eu, a Bia da turma de Bioquímica. Troquei de chip, salva esse número. Preciso de uma ajuda urgente: consegue fazer um Pix de R$ 380 pra pagar uma conta que vence hoje? Te devolvo à tarde.' },
+      B: { titulo: 'Exemplo B', resumo: 'mensagem em nome de banco',
+        gabarito: 'Diz ser instituição e pede código',
+        origem: 'aplicativo de mensagens', tipo: 'mensagem',
+        conteudo: 'Banco Exemplo: identificamos atividade suspeita. Sua conta será bloqueada em 30 minutos. Informe ao nosso atendente o código que você vai receber por SMS para cancelar o bloqueio.' },
+    };
+
+    /** Mensagem pronta da tela "Avisar os contatos" (RF15). */
+    const MENSAGEM_AVISO = 'Atenção: recebi uma tentativa de golpe por mensagem. Se alguém falar com você usando o meu nome ou pedir dinheiro, código ou dados com urgência, não responda. Me ligue no número que você já tem salvo para confirmar.';
+
+    /** Nomes curtos dos três passos da verificação, usados no indicador de progresso. */
+    const PASSOS_VERIFICACAO = ['Informar', 'Perguntas', 'Resultado'];
+
+    /* ========================================================================
+     * 2. Utilitários
+     * ====================================================================== */
+
+    /**
+     * Indexa uma lista de objetos pelo campo `id`.
+     * @template {{id: string}} T
+     * @param {T[]} lista
+     * @returns {Object<string, T>}
+     */
+    function indexarPorId(lista) {
+      return lista.reduce((mapa, item) => { mapa[item.id] = item; return mapa; }, {});
+    }
+
+    const TIPO_POR_ID = indexarPorId(TIPOS);
+    const REMETENTE_POR_ID = indexarPorId(REMETENTES);
+    const PEDIDO_POR_ID = indexarPorId(PEDIDOS);
+    const CONFIRMACAO_POR_ID = indexarPorId(CONFIRMACOES);
+    const INSTITUICAO_POR_ID = indexarPorId(INSTITUICOES);
+    const SITUACAO_POR_ID = indexarPorId(SITUACOES);
+
+    /**
+     * Troca os caracteres especiais do HTML por entidades.
+     * Todo texto digitado pelo usuário passa por aqui antes de ir para a tela.
+     * @param {*} texto
+     * @returns {string}
+     */
+    function escapar(texto) {
+      return String(texto)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    /**
+     * Deixa o texto em minúsculas, sem acentos e sem espaços nas pontas, para buscas.
+     * @param {string} texto
+     * @returns {string}
+     */
+    function normalizar(texto) {
+      return String(texto).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    }
+
+    /**
+     * Formata uma data como "18/11/2026 às 14:32".
+     * @param {Date} data
+     * @returns {string}
+     */
+    function formatarData(data) {
+      const doisDigitos = (numero) => String(numero).padStart(2, '0');
+      return `${doisDigitos(data.getDate())}/${doisDigitos(data.getMonth() + 1)}/${data.getFullYear()} às ${doisDigitos(data.getHours())}:${doisDigitos(data.getMinutes())}`;
+    }
+
+    /**
+     * Escreve uma quantidade de pontos com o plural correto.
+     * @param {number} quantidade
+     * @returns {string}
+     */
+    function textoDePontos(quantidade) {
+      return quantidade === 1 ? '1 ponto' : `${quantidade} pontos`;
+    }
+
+    /**
+     * Devolve os pedidos marcados na ordem em que aparecem no formulário.
+     * @param {Pedido[]} pedidos
+     * @returns {Array<Object>}
+     */
+    function pedidosOrdenados(pedidos) {
+      return PEDIDOS.filter((pedido) => pedidos.includes(pedido.id));
+    }
+
+    /**
+     * Prepara um endereço de site para a tela: permite quebra de linha só depois
+     * de cada ponto, para o endereço não ser cortado no meio de uma palavra.
+     * @param {string} endereco
+     * @returns {string} HTML seguro para inserir na página.
+     */
+    function enderecoQuebravel(endereco) {
+      return escapar(endereco).replace(/\./g, '.<wbr>');
+    }
+
+    /**
+     * Descreve os pedidos marcados em uma frase curta.
+     * @param {Pedido[]} pedidos
+     * @returns {string}
+     */
+    function descreverPedidos(pedidos) {
+      const rotulos = pedidosOrdenados(pedidos).map((pedido) => pedido.rotulo);
+      return rotulos.length ? rotulos.join(', ') : 'Nenhum';
+    }
+
+    /* ========================================================================
+     * 3. Risco: regra de cálculo da seção 4 (funções puras)
+     * ====================================================================== */
+
+    const Risco = Object.freeze({
+      /** Pontos de cada resposta das perguntas rápidas. */
+      PONTOS_RESPOSTA: Object.freeze({ sim: 2, naosei: 1, nao: 0 }),
+
+      /** Ponto somado quando o remetente é desconhecido. */
+      PONTO_REMETENTE_DESCONHECIDO: 1,
+
+      /** Maior total que ainda é risco baixo e maior total que ainda é risco médio. */
+      LIMITE_BAIXO: 2,
+      LIMITE_MEDIO: 6,
+
+      /**
+       * Soma os pontos das perguntas rápidas: "sim" vale 2 e "não sei" vale 1.
+       * @param {Array<?Resposta>} respostas
+       * @returns {number}
+       */
+      pontosDasRespostas(respostas) {
+        return respostas.reduce((total, resposta) => total + (Risco.PONTOS_RESPOSTA[resposta] || 0), 0);
+      },
+
+      /**
+       * Pontos do pedido. Com mais de um pedido, vale o de maior pontuação.
+       * @param {Pedido[]} pedidos
+       * @returns {number}
+       */
+      pontosDoPedido(pedidos) {
+        return pedidos.reduce((maior, id) => Math.max(maior, PEDIDO_POR_ID[id] ? PEDIDO_POR_ID[id].pontos : 0), 0);
+      },
+
+      /**
+       * Ponto do remetente: só o desconhecido pontua.
+       * @param {?Remetente} remetente
+       * @returns {number}
+       */
+      pontosDoRemetente(remetente) {
+        return remetente === 'desconhecido' ? Risco.PONTO_REMETENTE_DESCONHECIDO : 0;
+      },
+
+      /**
+       * Converte o total de pontos em nível: 0 a 2 baixo, 3 a 6 médio, 7 ou mais alto.
+       * @param {number} pontos
+       * @returns {NivelRisco}
+       */
+      nivelPorPontos(pontos) {
+        if (pontos <= Risco.LIMITE_BAIXO) return 'baixo';
+        if (pontos <= Risco.LIMITE_MEDIO) return 'medio';
+        return 'alto';
+      },
+
+      /**
+       * Calcula o risco de uma verificação e devolve as parcelas da soma.
+       * @param {{respostas: Array<?Resposta>, pedidos: Pedido[], remetente: ?Remetente}} verificacao
+       * @returns {ResultadoRisco}
+       */
+      calcular(verificacao) {
+        const perguntas = Risco.pontosDasRespostas(verificacao.respostas);
+        const pedido = Risco.pontosDoPedido(verificacao.pedidos);
+        const remetente = Risco.pontosDoRemetente(verificacao.remetente);
+        const total = perguntas + pedido + remetente;
+        return { perguntas, pedido, remetente, total, nivel: Risco.nivelPorPontos(total) };
+      },
+    });
+
+    /* ========================================================================
+     * 4. Sinais e recomendação (funções puras)
+     * ====================================================================== */
+
+    /**
+     * Lista os sinais que justificam o nível de risco (RF06 e RNF09).
+     * Respostas "sim" e pedidos viram sinais; respostas "não sei" viram pontos de dúvida.
+     * @param {Verificacao} verificacao
+     * @returns {Array<{icone: string, titulo: string, explicacao: string, duvida: boolean}>}
+     */
+    function listarSinais(verificacao) {
+      const sinais = [];
+      PERGUNTAS.forEach((pergunta, indice) => {
+        const resposta = verificacao.respostas[indice];
+        if (resposta === 'sim') {
+          sinais.push({ icone: pergunta.icone, titulo: pergunta.sinal, explicacao: pergunta.explicacao, duvida: false });
+        } else if (resposta === 'naosei') {
+          sinais.push({ icone: 'interrogacao', titulo: pergunta.duvida, explicacao: EXPLICACAO_DUVIDA, duvida: true });
+        }
+      });
+      pedidosOrdenados(verificacao.pedidos)
+        .filter((pedido) => pedido.pontos > 0)
+        .forEach((pedido) => sinais.push({ icone: pedido.icone, titulo: pedido.sinal, explicacao: pedido.explicacao, duvida: false }));
+      if (verificacao.remetente === 'desconhecido') {
+        sinais.push({ ...SINAL_DESCONHECIDO, duvida: false });
+      }
+      return sinais;
+    }
+
+    /**
+     * Escolhe a recomendação de próximo passo para o nível e o remetente.
+     * @param {Verificacao} verificacao
+     * @returns {string}
+     */
+    function recomendar(verificacao) {
+      return RECOMENDACOES[verificacao.risco.nivel][verificacao.remetente || 'desconhecido'];
+    }
+
+    /**
+     * Aponta o tipo de golpe mais parecido com a verificação, para abrir já expandido
+     * quando o usuário toca em "Entender um sinal".
+     * @param {?Verificacao} verificacao
+     * @returns {?string} Id do golpe ou null quando nenhum se destaca.
+     */
+    function golpeParecido(verificacao) {
+      if (!verificacao) return null;
+      if (verificacao.remetente === 'pessoa') return 'parente';
+      if (verificacao.remetente === 'instituicao') {
+        if (verificacao.pedidos.includes('codigo') || verificacao.pedidos.includes('dados')) return 'central';
+        if (verificacao.pedidos.includes('pix')) return 'cobranca';
+      }
+      if (verificacao.respostas[3] === 'sim') return 'vaga';
+      return null;
+    }
+
+    /* ========================================================================
+     * 5. Comparador de contato com os canais oficiais (funções puras)
+     * ====================================================================== */
+
+    const Comparador = Object.freeze({
+      /**
+       * Mantém só os dígitos de um texto.
+       * @param {string} texto
+       * @returns {string}
+       */
+      digitos(texto) {
+        return String(texto).replace(/\D/g, '');
+      },
+
+      /**
+       * Extrai o domínio de um endereço: sem protocolo, sem "www." e sem caminho.
+       * @param {string} texto
+       * @returns {string}
+       */
+      dominio(texto) {
+        return String(texto).trim().toLowerCase()
+          .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+          .replace(/^www\./, '')
+          .split(/[/?#]/)[0];
+      },
+
+      /**
+       * Junta os canais oficiais de uma instituição em uma lista única.
+       * @param {Object} instituicao
+       * @returns {Array<{tipo: string, rotulo: string, valor: string}>}
+       */
+      canaisDe(instituicao) {
+        return [
+          ...instituicao.telefones.map((telefone) => ({ tipo: 'telefone', rotulo: telefone.rotulo, valor: telefone.valor })),
+          { tipo: 'site', rotulo: 'Site', valor: instituicao.site },
+          ...instituicao.perfis.map((perfil) => ({ tipo: 'perfil', rotulo: 'Perfil verificado', valor: perfil })),
+        ];
+      },
+
+      /**
+       * Compara o contato recebido com os canais oficiais da instituição.
+       * Aceita telefone, e-mail (compara o domínio com o do site), site ou perfil.
+       * @param {string} contato
+       * @param {Object} instituicao
+       * @returns {{confere: boolean, canal: ?{rotulo: string, valor: string}}}
+       */
+      comparar(contato, instituicao) {
+        const bruto = String(contato).trim().toLowerCase();
+        const canais = Comparador.canaisDe(instituicao);
+        const dominioOficial = Comparador.dominio(instituicao.site);
+        let canal = null;
+
+        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(bruto)) {
+          const dominioDoEmail = bruto.split('@')[1];
+          if (dominioDoEmail === dominioOficial) canal = { rotulo: 'E-mail com o endereço oficial', valor: `@${dominioOficial}` };
+        } else if (/^[\d\s()+.-]+$/.test(bruto) && Comparador.digitos(bruto).length >= 8) {
+          const numero = Comparador.digitos(bruto).replace(/^55(?=\d{10,}$)/, '');
+          canal = canais.find((item) => item.tipo === 'telefone' && Comparador.digitos(item.valor) === numero) || null;
+        } else if (bruto.startsWith('@')) {
+          canal = canais.find((item) => item.tipo === 'perfil' && item.valor.toLowerCase() === bruto) || null;
+        } else {
+          canal = canais.find((item) => item.tipo === 'site' && Comparador.dominio(item.valor) === Comparador.dominio(bruto))
+            || canais.find((item) => item.tipo === 'perfil' && item.valor.toLowerCase() === `@${bruto}`)
+            || null;
+        }
+        return { confere: Boolean(canal), canal: canal ? { rotulo: canal.rotulo, valor: canal.valor } : null };
+      },
+    });
+
+    /* ========================================================================
+     * 6. Estado em memória
+     * ====================================================================== */
+
+    /**
+     * Estado único do protótipo. Nada é gravado fora da memória da página.
+     * @type {{pilha: string[], sessao: ?Sessao, historico: Sessao[], avisoInicio: string, falhaConexao: boolean, proximoId: number}}
+     */
+    const estado = {
+      pilha: ['inicio'],     // telas visitadas; a última é a que está aberta
+      sessao: null,          // verificação ou atendimento em andamento
+      historico: [],         // sessões salvas, da mais recente para a mais antiga
+      avisoInicio: '',       // confirmação mostrada no Início depois de salvar
+      falhaConexao: false,   // recurso do protótipo: simula envio sem conexão
+      proximoId: 1,
+    };
+
+    /**
+     * Cria uma verificação nova, vazia ou preenchida por um compartilhamento simulado.
+     * @param {?{origem: string, tipo: TipoComunicacao, conteudo: string}} exemplo
+     * @returns {Verificacao}
+     */
+    function criarVerificacao(exemplo) {
+      const id = estado.proximoId;
+      estado.proximoId += 1;
+      return {
+        id,
+        data: null,
+        salva: false,
+        origem: exemplo ? exemplo.origem : null,
+        tipo: exemplo ? exemplo.tipo : 'mensagem',
+        conteudo: exemplo ? exemplo.conteudo : '',
+        remetente: null,
+        pedidos: [],
+        respostas: PERGUNTAS.map(() => null),
+        perguntaAtual: 0,
+        risco: null,
+        confirmacao: null,
+        erros: {},
+        inst: { iniciada: false, busca: '', selecionada: null, contato: '', comparacao: null },
+      };
+    }
+
+    /**
+     * Cria uma sessão. Sem verificação, é o caminho direto "Já caí ou quase caí".
+     * @param {?Verificacao} verificacao
+     * @returns {Sessao}
+     */
+    function criarSessao(verificacao) {
+      return {
+        verificacao,
+        ajuda: { situacao: null, marcados: {} },
+        relato: {
+          iniciado: false, tipo: 'mensagem', remetente: '', pedidos: [], texto: '',
+          identificado: false, // anônimo por padrão (RNF05)
+          nome: '', envio: 'rascunho', tentativas: 0, erros: {},
+        },
+        aviso: { texto: MENSAGEM_AVISO, compartilhado: false, erro: false },
+      };
+    }
+
+    /**
+     * Devolve a verificação da sessão atual.
+     * @returns {?Verificacao}
+     */
+    function verificacaoAtual() {
+      return estado.sessao ? estado.sessao.verificacao : null;
+    }
+
+    /**
+     * Copia os dados da verificação para o relato na primeira vez em que ele é aberto.
+     * Depois disso, o que o usuário editar no relato é preservado.
+     */
+    function prepararRelato() {
+      const relato = estado.sessao.relato;
+      if (relato.iniciado) return;
+      relato.iniciado = true;
+      const verificacao = verificacaoAtual();
+      if (!verificacao) return;
+      relato.tipo = verificacao.tipo;
+      relato.remetente = verificacao.remetente || '';
+      relato.pedidos = verificacao.pedidos.slice();
+      relato.texto = verificacao.conteudo;
+    }
+
+    /**
+     * Salva a sessão atual no histórico (RF17). Uma sessão já salva só é atualizada.
+     * @returns {'nova'|'atualizada'|'nada'} O que aconteceu com o histórico.
+     */
+    function salvarSessao() {
+      const sessao = estado.sessao;
+      if (!sessao || !sessao.verificacao) return 'nada';
+      if (sessao.verificacao.salva) return 'atualizada';
+      sessao.verificacao.salva = true;
+      estado.historico.unshift(sessao);
+      return 'nova';
+    }
+
+    /**
+     * Liga ou desliga um pedido respeitando a regra de que "Nenhum" é exclusivo.
+     * @param {Pedido[]} pedidos Lista atual.
+     * @param {Pedido} id        Pedido alterado.
+     * @param {boolean} marcado  Novo estado da caixa.
+     * @returns {Pedido[]} Nova lista.
+     */
+    function alternarPedido(pedidos, id, marcado) {
+      if (id === 'nenhum') return marcado ? ['nenhum'] : [];
+      const semEste = pedidos.filter((pedido) => pedido !== 'nenhum' && pedido !== id);
+      return marcado ? semEste.concat(id) : semEste;
+    }
+
+    /* ========================================================================
+     * 7. Interface: moldura, foco e anúncios
+     * ====================================================================== */
+
+    /** Elementos fixos da moldura. */
+    const el = {
+      app: document.getElementById('app'),
+      voltar: document.getElementById('btn-voltar'),
+      progresso: document.getElementById('progresso'),
+      conteudo: document.getElementById('conteudo'),
+      acoes: document.getElementById('acoes'),
+      inicio: document.getElementById('btn-inicio'),
+      ajuda: document.getElementById('btn-ajuda'),
+      anuncio: document.getElementById('anuncio'),
+    };
+
+    /**
+     * Monta o HTML de um ícone do conjunto embutido.
+     * @param {string} nome      Nome do símbolo, sem o prefixo "i-".
+     * @param {number} [tamanho] Lado em pixels.
+     * @param {string} [classe]  Classe extra.
+     * @returns {string}
+     */
+    function icone(nome, tamanho = 22, classe = '') {
+      return `<svg class="icone${classe ? ` ${classe}` : ''}" width="${tamanho}" height="${tamanho}" aria-hidden="true" focusable="false"><use href="#i-${nome}"/></svg>`;
+    }
+
+    /**
+     * Monta o HTML de um botão de ação.
+     * @param {Object} opcoes
+     * @param {string} opcoes.acao               Chave em ACOES.
+     * @param {string} opcoes.rotulo             Texto visível.
+     * @param {string} [opcoes.estilo]           principal, secundario, texto ou mini.
+     * @param {string} [opcoes.icone]            Ícone à esquerda.
+     * @param {string} [opcoes.id]               Id do elemento.
+     * @param {Object<string, string>} [opcoes.dados] Atributos data- extras.
+     * @param {string} [opcoes.classe]           Classes extras.
+     * @param {boolean} [opcoes.pressionado]     Valor de aria-pressed, quando se aplica.
+     * @returns {string}
+     */
+    function botao(opcoes) {
+      const dados = Object.keys(opcoes.dados || {})
+        .map((chave) => ` data-${chave}="${escapar(opcoes.dados[chave])}"`).join('');
+      const pressionado = typeof opcoes.pressionado === 'boolean' ? ` aria-pressed="${opcoes.pressionado}"` : '';
+      return `<button type="button" class="botao botao--${opcoes.estilo || 'principal'}${opcoes.classe ? ` ${opcoes.classe}` : ''}"`
+        + `${opcoes.id ? ` id="${opcoes.id}"` : ''} data-acao="${opcoes.acao}"${dados}${pressionado}>`
+        + `${opcoes.icone ? icone(opcoes.icone) : ''}<span>${opcoes.rotulo}</span></button>`;
+    }
+
+    /**
+     * Monta uma opção de rádio ou de caixa de seleção com área de toque grande.
+     * @param {Object} opcoes
+     * @param {'radio'|'checkbox'} opcoes.controle
+     * @param {string} opcoes.id
+     * @param {string} opcoes.nome       Atributo name do grupo.
+     * @param {string} opcoes.campo      Chave em CAMPOS.
+     * @param {string} opcoes.valor
+     * @param {boolean} opcoes.marcada
+     * @param {string} opcoes.rotulo
+     * @param {string} [opcoes.dica]
+     * @param {string} [opcoes.descritoPor] Id do texto de erro ou de ajuda.
+     * @returns {string}
+     */
+    function opcao(opcoes) {
+      return `<label class="opcao${opcoes.marcada ? ' opcao--marcada' : ''}" for="${opcoes.id}">`
+        + `<input type="${opcoes.controle}" id="${opcoes.id}" name="${opcoes.nome}" value="${escapar(opcoes.valor)}" data-campo="${opcoes.campo}"`
+        + `${opcoes.marcada ? ' checked' : ''}${opcoes.descritoPor ? ` aria-describedby="${opcoes.descritoPor}"` : ''}>`
+        + `<span class="opcao__texto"><span class="opcao__rotulo">${opcoes.rotulo}</span>`
+        + `${opcoes.dica ? `<span class="opcao__dica">${opcoes.dica}</span>` : ''}</span></label>`;
+    }
+
+    /**
+     * Monta uma mensagem de erro de campo: diz o que falta e como resolver (RNF06).
+     * @param {string} id
+     * @param {string} texto
+     * @returns {string}
+     */
+    function erroDeCampo(id, texto) {
+      return `<p class="erro" id="${id}" role="alert">${icone('triangulo', 20)}<span>${texto}</span></p>`;
+    }
+
+    /**
+     * Monta o grupo de caixas "O que está sendo pedido", usado no formulário e no relato.
+     * @param {Object} opcoes
+     * @param {string} opcoes.prefixo   Prefixo dos ids, para não repetir ids entre telas.
+     * @param {string} opcoes.campo     Chave em CAMPOS.
+     * @param {string} opcoes.legenda
+     * @param {Pedido[]} opcoes.marcados
+     * @returns {string}
+     */
+    function grupoDePedidos(opcoes) {
+      const caixas = PEDIDOS.map((pedido) => opcao({
+        controle: 'checkbox', id: `${opcoes.prefixo}-${pedido.id}`, nome: opcoes.prefixo, campo: opcoes.campo,
+        valor: pedido.id, marcada: opcoes.marcados.includes(pedido.id), rotulo: pedido.rotulo,
+        descritoPor: `${opcoes.prefixo}-dica`,
+      })).join('');
+      return `<fieldset class="grupo">
+          <legend>${opcoes.legenda}</legend>
+          <p class="dica" id="${opcoes.prefixo}-dica">Pode marcar mais de um. Senha e número do cartão contam como dados pessoais.</p>
+          <div class="opcoes opcoes--duas">${caixas}</div>
+        </fieldset>`;
+    }
+
+    /**
+     * Monta o indicador de progresso da verificação (RNF07).
+     * @param {number} passo Passo atual, de 1 a 3.
+     * @returns {string}
+     */
+    function montarProgresso(passo) {
+      const itens = PASSOS_VERIFICACAO.map((nome, indice) => {
+        const numero = indice + 1;
+        if (numero < passo) return `<li class="feito">${icone('check', 16)}<span class="sr-only">Concluído: </span>${nome}</li>`;
+        if (numero === passo) return `<li class="atual" aria-current="step"><span class="sr-only">Passo atual: </span>${nome}</li>`;
+        return `<li>${nome}</li>`;
+      }).join('');
+      return `<p class="sr-only">Passo ${passo} de ${PASSOS_VERIFICACAO.length}</p><ol class="progresso__trilha">${itens}</ol>`;
+    }
+
+    /**
+     * Leva o foco para um elemento, sem rolar a tela.
+     * @param {string} id
+     */
+    function focar(id) {
+      const alvo = id ? document.getElementById(id) : null;
+      if (alvo) alvo.focus({ preventScroll: true });
+    }
+
+    /**
+     * Leva o foco para um campo com erro e garante que ele apareça na área visível.
+     * @param {string} id
+     */
+    function focarComRolagem(id) {
+      const alvo = document.getElementById(id);
+      if (!alvo) return;
+      alvo.scrollIntoView({ block: 'center' });
+      alvo.focus({ preventScroll: true });
+    }
+
+    /**
+     * Envia um texto para o leitor de tela sem mudar o foco.
+     * @param {string} texto
+     */
+    function anunciar(texto) {
+      el.anuncio.textContent = '';
+      window.setTimeout(() => { el.anuncio.textContent = texto; }, 50);
+    }
+
+    /**
+     * Remove a mensagem de erro de um campo de texto sem redesenhar a tela,
+     * para não atrapalhar a digitação.
+     * @param {string} idCampo
+     * @param {string} idErro
+     */
+    function limparErroNoLugar(idCampo, idErro) {
+      const erro = document.getElementById(idErro);
+      if (erro) erro.remove();
+      const campo = document.getElementById(idCampo);
+      if (campo) campo.removeAttribute('aria-invalid');
+    }
+
+    /**
+     * Atualiza as partes fixas da moldura para a tela aberta: botão Voltar,
+     * progresso, marcação dos atalhos e título da página.
+     * @param {string} id        Id da tela.
+     * @param {Object} definicao Entrada de TELAS.
+     */
+    function desenharMoldura(id, definicao) {
+      el.app.dataset.tela = id;
+      el.voltar.hidden = id === 'inicio';
+
+      const verificacao = verificacaoAtual();
+      const mostrarProgresso = definicao.passo > 0 && !(verificacao && verificacao.salva);
+      el.progresso.hidden = !mostrarProgresso;
+      el.progresso.innerHTML = mostrarProgresso ? montarProgresso(definicao.passo) : '';
+
+      if (id === 'inicio') el.inicio.setAttribute('aria-current', 'page'); else el.inicio.removeAttribute('aria-current');
+      if (id === 'canais') el.ajuda.setAttribute('aria-current', 'page'); else el.ajuda.removeAttribute('aria-current');
+
+      document.title = `${definicao.titulo} · Confere Aí`;
+    }
+
+    /**
+     * Desenha a tela que está no topo da pilha.
+     * @param {Object} [opcoes]
+     * @param {boolean} [opcoes.manterFoco] true quando a tela é a mesma e só um dado mudou:
+     *                                      preserva o foco e a rolagem.
+     * @param {string} [opcoes.foco]        Id que recebe o foco em uma troca de tela.
+     */
+    function desenhar(opcoes = {}) {
+      const id = telaAtual();
+      const definicao = TELAS[id];
+      const partes = definicao.montar();
+      const focoAnterior = opcoes.manterFoco && document.activeElement ? document.activeElement.id : '';
+      const rolagem = el.conteudo.scrollTop;
+
+      el.conteudo.innerHTML = partes.conteudo;
+      el.acoes.innerHTML = partes.acoes;
+      el.acoes.hidden = !partes.acoes.trim();
+      desenharMoldura(id, definicao);
+
+      if (opcoes.manterFoco) {
+        el.conteudo.scrollTop = rolagem;
+        focar(focoAnterior);
+        return;
+      }
+      el.conteudo.scrollTop = 0;
+      el.conteudo.classList.remove('conteudo--entrando');
+      void el.conteudo.offsetWidth; // reinicia a animação de entrada
+      el.conteudo.classList.add('conteudo--entrando');
+      focar(opcoes.foco || 'titulo-tela');
+    }
+
+    /**
+     * Redesenha a tela atual mantendo foco e rolagem.
+     */
+    function atualizar() {
+      desenhar({ manterFoco: true });
+    }
+
+    /* ========================================================================
+     * 8. Telas: cada função devolve o conteúdo e o rodapé de ações
+     * ====================================================================== */
+
+    /**
+     * @typedef {Object} PartesDaTela
+     * @property {string} conteudo HTML da área rolável.
+     * @property {string} acoes    HTML do rodapé de ações (vazio esconde o rodapé).
+     */
+
+    /**
+     * Tela Início (RF01, RF02, RF17).
+     * @returns {PartesDaTela}
+     */
+    function montarInicio() {
+      const aviso = estado.avisoInicio
+        ? `<div class="aviso aviso--sucesso" role="status">${icone('circulo-check')}<p>${escapar(estado.avisoInicio)}</p></div>`
+        : '';
+
+      const itens = estado.historico.map((sessao) => {
+        const verificacao = sessao.verificacao;
+        const nivel = NIVEIS[verificacao.risco.nivel];
+        const confirmacao = verificacao.confirmacao
+          ? `<span>Confirmação: ${CONFIRMACAO_POR_ID[verificacao.confirmacao].curto}</span>` : '';
+        return `<li><button type="button" class="historico__item" id="salva-${verificacao.id}" data-acao="abrir-salva" data-id="${verificacao.id}">
+            <span class="selo selo--${verificacao.risco.nivel}" aria-hidden="true">${icone(nivel.icone, 22)}</span>
+            <span class="historico__texto">
+              <span>${formatarData(verificacao.data)}</span>
+              <strong>${TIPO_POR_ID[verificacao.tipo].rotulo} · ${nivel.titulo}</strong>
+              ${confirmacao}
+            </span>
+            ${icone('seta-dir', 20)}
+          </button></li>`;
+      }).join('');
+
+      const historico = estado.historico.length
+        ? `<ul class="historico">${itens}</ul>`
+        : `<div class="vazio">${icone('caixa', 32)}<strong>Nenhuma verificação salva ainda</strong>
+            <p>Quando você encerrar ou concluir uma verificação, ela aparece aqui.</p></div>`;
+
+      const exemplos = Object.keys(EXEMPLOS).map((chave) => {
+        const exemplo = EXEMPLOS[chave];
+        return `<button type="button" class="botao botao--proto" id="simular-${chave}" data-acao="simular" data-exemplo="${chave}">
+            ${icone('compartilhar')}<span><strong>${exemplo.titulo}: ${exemplo.resumo}</strong>${exemplo.gabarito}</span>
+          </button>`;
+      }).join('');
+
+      const conteudo = `
+        <h1 class="sr-only" id="titulo-tela" tabindex="-1">Início</h1>
+        <section class="pausa" aria-label="Orientação de pausa">
+          <div class="pausa__respiro" aria-hidden="true">${icone('pausa', 26)}</div>
+          <p class="pausa__texto"><strong>Pare e respire:</strong> pedido legítimo não exige decisão em minutos</p>
+        </section>
+        ${aviso}
+        <section class="secao" aria-labelledby="tit-historico">
+          <h2 class="subtitulo" id="tit-historico">Suas verificações</h2>
+          ${historico}
+        </section>
+        <section class="prototipo" aria-labelledby="tit-simular">
+          <p class="prototipo__selo">${icone('frasco', 18)}Recurso do protótipo</p>
+          <h2 class="rotulo-secao" id="tit-simular">Simular compartilhamento</h2>
+          <p class="dica">No aplicativo real, você tocaria em "Compartilhar" no WhatsApp ou no e-mail e escolheria o Confere Aí. Aqui, escolha um exemplo:</p>
+          ${exemplos}
+        </section>`;
+
+      const acoes = `
+        <button type="button" class="botao botao--principal botao--entrada" data-acao="verificar">
+          ${icone('lupa')}<span>Verificar uma comunicação</span>${icone('seta-dir', 20, 'seta')}
+        </button>
+        <button type="button" class="botao botao--secundario botao--entrada" data-acao="ja-cai">
+          ${icone('coracao')}<span>Já caí ou quase caí</span>${icone('seta-dir', 20, 'seta')}
+        </button>
+        <button type="button" class="botao botao--secundario botao--entrada" data-acao="sinais">
+          ${icone('livro')}<span>Conhecer os sinais de alerta</span>${icone('seta-dir', 20, 'seta')}
+        </button>`;
+
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Tela Informar a comunicação (RF03, RF04).
+     * @returns {PartesDaTela}
+     */
+    function montarInformar() {
+      const verificacao = verificacaoAtual();
+      const tipo = TIPO_POR_ID[verificacao.tipo];
+      const erros = verificacao.erros;
+
+      const origem = verificacao.origem
+        ? `<div class="aviso aviso--info">${icone('compartilhar')}<p><strong>Recebido por compartilhamento (${escapar(verificacao.origem)}).</strong> Confira o tipo e o conteúdo e complete o que falta.</p></div>`
+        : '';
+
+      const tipos = TIPOS.map((item) => opcao({
+        controle: 'radio', id: `tipo-${item.id}`, nome: 'tipo', campo: 'tipo',
+        valor: item.id, marcada: verificacao.tipo === item.id, rotulo: item.rotulo,
+      })).join('');
+
+      const remetentes = REMETENTES.map((item) => opcao({
+        controle: 'radio', id: `rem-${item.id}`, nome: 'remetente', campo: 'remetente',
+        valor: item.id, marcada: verificacao.remetente === item.id, rotulo: item.rotulo, dica: item.dica,
+        descritoPor: erros.remetente ? 'erro-remetente' : 'dica-remetente',
+      })).join('');
+
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Informar a comunicação</h1>
+        <p class="intro">Conte o que você recebeu. O que você escrever fica só neste aparelho.</p>
+        ${origem}
+
+        <fieldset class="grupo">
+          <legend>Tipo de comunicação</legend>
+          <div class="opcoes opcoes--duas">${tipos}</div>
+        </fieldset>
+
+        <div class="campo">
+          <label class="rotulo" for="campo-conteudo">${tipo.campo}</label>
+          <p class="dica" id="dica-conteudo">${tipo.dica}</p>
+          <textarea class="entrada" id="campo-conteudo" rows="5" data-campo="conteudo"
+            aria-describedby="dica-conteudo${erros.conteudo ? ' erro-conteudo' : ''}"${erros.conteudo ? ' aria-invalid="true"' : ''}>${escapar(verificacao.conteudo)}</textarea>
+          ${erros.conteudo ? erroDeCampo('erro-conteudo', tipo.falta) : ''}
+        </div>
+
+        <fieldset class="grupo" id="grupo-remetente">
+          <legend>Quem o remetente diz ser</legend>
+          <p class="dica" id="dica-remetente">Marque quem a pessoa afirma ser, mesmo que você desconfie.</p>
+          <div class="opcoes">${remetentes}</div>
+          ${erros.remetente ? erroDeCampo('erro-remetente', 'Falta dizer quem o remetente diz ser. Escolha uma das três opções acima para continuar.') : ''}
+        </fieldset>
+
+        ${grupoDePedidos({ prefixo: 'ped', campo: 'pedido', legenda: 'O que está sendo pedido', marcados: verificacao.pedidos })}
+
+        <p class="dica">${icone('cadeado', 18)} O Confere Aí não pede senha, código nem dados do banco.</p>`;
+
+      const acoes = botao({ acao: 'continuar', rotulo: 'Continuar', id: 'btn-continuar' });
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Tela Perguntas rápidas (RF05): uma pergunta por vez, na mesma tela.
+     * @returns {PartesDaTela}
+     */
+    function montarPerguntas() {
+      const verificacao = verificacaoAtual();
+      const indice = verificacao.perguntaAtual;
+      const pergunta = PERGUNTAS[indice];
+      const respostaAtual = verificacao.respostas[indice];
+
+      const pontos = PERGUNTAS.map((item, posicao) => {
+        const classe = posicao < indice ? 'feito' : posicao === indice ? 'atual' : '';
+        return `<li class="${classe}"></li>`;
+      }).join('');
+
+      const conteudo = `
+        <h1 class="titulo titulo--menor" id="titulo-tela" tabindex="-1">Perguntas rápidas</h1>
+        <section class="pergunta" aria-labelledby="pergunta-texto">
+          <div class="pergunta__conta">
+            <p>Pergunta ${indice + 1} de ${PERGUNTAS.length}</p>
+            <ol class="pergunta__pontos" aria-hidden="true">${pontos}</ol>
+          </div>
+          <div class="pergunta__icone" aria-hidden="true">${icone(pergunta.icone, 28)}</div>
+          <h2 class="pergunta__texto" id="pergunta-texto" tabindex="-1">${pergunta.texto}</h2>
+          <p class="pergunta__ajuda">${pergunta.ajuda}</p>
+        </section>
+        <section class="secao" aria-labelledby="tit-informado">
+          <h2 class="rotulo-secao" id="tit-informado">O que você informou</h2>
+          <blockquote class="citacao citacao--rolavel" tabindex="0" aria-labelledby="tit-informado">${escapar(verificacao.conteudo)}</blockquote>
+        </section>`;
+
+      const botoes = RESPOSTAS.map((resposta) => botao({
+        acao: 'responder', rotulo: resposta.rotulo, estilo: 'secundario', classe: 'botao--resposta',
+        icone: resposta.icone, id: `resp-${resposta.id}`, dados: { valor: resposta.id },
+        pressionado: respostaAtual === resposta.id,
+      })).join('');
+
+      const acoes = `
+        <p class="acoes__rotulo" id="rotulo-respostas">${respostaAtual ? 'Você já respondeu. Toque em uma resposta para seguir.' : 'Toque em uma resposta para continuar.'}</p>
+        <div class="acoes__trio" role="group" aria-labelledby="rotulo-respostas">${botoes}</div>`;
+
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Monta o resumo do que o usuário informou, usado no Resultado.
+     * @param {Verificacao} verificacao
+     * @returns {string}
+     */
+    function montarResumoInformado(verificacao) {
+      const respostas = PERGUNTAS.map((pergunta, indice) => {
+        const resposta = RESPOSTAS.find((item) => item.id === verificacao.respostas[indice]);
+        return `<li>${icone('seta-dir', 16)}<span>${pergunta.texto} <strong>${resposta ? resposta.rotulo : 'Sem resposta'}</strong></span></li>`;
+      }).join('');
+      return `<dl class="resumo">
+          <div><dt>Tipo</dt><dd>${TIPO_POR_ID[verificacao.tipo].rotulo}</dd></div>
+          <div><dt>Quem o remetente diz ser</dt><dd>${REMETENTE_POR_ID[verificacao.remetente].rotulo}</dd></div>
+          <div><dt>O que está sendo pedido</dt><dd>${descreverPedidos(verificacao.pedidos)}</dd></div>
+          <div><dt>${TIPO_POR_ID[verificacao.tipo].campo}</dt><dd class="citacao">${escapar(verificacao.conteudo)}</dd></div>
+          <div><dt>Suas respostas</dt><dd><ul class="lista-marcada">${respostas}</ul></dd></div>
+        </dl>`;
+    }
+
+    /**
+     * Tela Resultado (RF06, RF07, RNF09).
+     * @returns {PartesDaTela}
+     */
+    function montarResultado() {
+      const verificacao = verificacaoAtual();
+      const risco = verificacao.risco;
+      const nivel = NIVEIS[risco.nivel];
+      const sinais = listarSinais(verificacao);
+
+      const salva = verificacao.salva
+        ? `<p class="etiqueta">${icone('check', 16)}Verificação salva em ${formatarData(verificacao.data)}</p>` : '';
+
+      const medidor = ['baixo', 'medio', 'alto'].map((chave) =>
+        `<li class="${chave === risco.nivel ? 'medidor__atual' : ''}">${NIVEIS[chave].curto}</li>`).join('');
+
+      const avisoBaixo = risco.nivel === 'baixo'
+        ? `<div class="aviso aviso--alerta">${icone('info')}<p><strong>Este resultado não garante que a comunicação é legítima.</strong> Ele só mostra que poucos sinais de alerta apareceram.</p></div>`
+        : '';
+
+      const listaDeSinais = sinais.length
+        ? `<ul class="sinais">${sinais.map((sinal) => `
+            <li class="sinal${sinal.duvida ? ' sinal--duvida' : ''}">
+              <span class="sinal__icone" aria-hidden="true">${icone(sinal.icone)}</span>
+              <div><p class="sinal__titulo">${sinal.titulo}</p><p class="sinal__explicacao">${sinal.explicacao}</p></div>
+            </li>`).join('')}</ul>`
+        : `<div class="vazio">${icone('circulo-check', 32)}<strong>Nenhum sinal de alerta nas suas respostas</strong>
+            <p>Mesmo assim, confirme por outro canal se algo parecer estranho.</p></div>`;
+
+      const confirmacao = verificacao.confirmacao
+        ? `<div class="aviso aviso--info">${icone('info')}<p>Confirmação registrada: <strong>${CONFIRMACAO_POR_ID[verificacao.confirmacao].curto}</strong>.</p></div>`
+        : '';
+
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Resultado</h1>
+        ${salva}
+        <section class="risco risco--${risco.nivel}" aria-labelledby="risco-nivel">
+          <div class="risco__topo">
+            <span class="risco__icone" aria-hidden="true">${icone(nivel.icone, 34)}</span>
+            <div>
+              <p class="risco__rotulo">Nível de risco</p>
+              <p class="risco__nivel" id="risco-nivel">${nivel.titulo}</p>
+            </div>
+          </div>
+          <ol class="medidor" aria-hidden="true">${medidor}</ol>
+          <p>${nivel.resumo}</p>
+          <p class="risco__apoio">Este resultado é um apoio para a sua decisão. Ele se baseia só no que você informou.</p>
+        </section>
+        ${avisoBaixo}
+
+        <section class="secao" aria-labelledby="tit-sinais">
+          <h2 class="subtitulo" id="tit-sinais">Sinais encontrados${sinais.length ? ` (${sinais.length})` : ''}</h2>
+          ${listaDeSinais}
+          ${botao({ acao: 'entender-sinal', rotulo: 'Entender um sinal', estilo: 'secundario', icone: 'livro', id: 'btn-entender' })}
+        </section>
+
+        <section class="secao" aria-labelledby="tit-proximo">
+          <h2 class="subtitulo" id="tit-proximo">Próximo passo</h2>
+          <div class="proximo">${icone('seta-dir')}<p>${recomendar(verificacao)}</p></div>
+          ${confirmacao}
+        </section>
+
+        <details class="sanfona">
+          <summary>Como este resultado foi calculado${icone('seta-baixo', 20, 'seta')}</summary>
+          <div class="sanfona__corpo">
+            <ul class="conta">
+              <li><span>Perguntas rápidas (sim vale 2, não sei vale 1)</span><strong>${textoDePontos(risco.perguntas)}</strong></li>
+              <li><span>Pedido (vale o de maior peso)</span><strong>${textoDePontos(risco.pedido)}</strong></li>
+              <li><span>Remetente desconhecido</span><strong>${textoDePontos(risco.remetente)}</strong></li>
+              <li class="conta__total"><span>Total</span><strong>${textoDePontos(risco.total)}</strong></li>
+            </ul>
+            <p class="dica">De 0 a 2 pontos, risco baixo. De 3 a 6, risco médio. Com 7 ou mais, risco alto.</p>
+          </div>
+        </details>
+
+        <details class="sanfona">
+          <summary>O que você informou${icone('seta-baixo', 20, 'seta')}</summary>
+          <div class="sanfona__corpo">${montarResumoInformado(verificacao)}</div>
+        </details>`;
+
+      // RF07: confirmar só aparece para instituição ou pessoa conhecida; encerrar, só com risco baixo.
+      const confirmar = verificacao.remetente === 'instituicao'
+        ? { acao: 'confirmar-instituicao', rotulo: 'Confirmar com a instituição', icone: 'predio' }
+        : verificacao.remetente === 'pessoa'
+          ? { acao: 'confirmar-pessoa', rotulo: 'Confirmar com a pessoa', icone: 'pessoa' }
+          : null;
+      const oQueFazer = { acao: 'o-que-fazer', rotulo: 'Ver o que fazer agora', icone: 'coracao' };
+      const encerrar = { acao: 'encerrar', rotulo: 'Encerrar', icone: 'check' };
+
+      const ordem = risco.nivel === 'baixo'
+        ? [encerrar, confirmar, oQueFazer]
+        : [confirmar, oQueFazer];
+      const acoes = ordem.filter(Boolean)
+        .map((item, posicao) => botao({ ...item, estilo: posicao === 0 ? 'principal' : 'secundario' }))
+        .join('');
+
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Monta os três botões de registro do resultado da confirmação (RF10).
+     * @param {Verificacao} verificacao
+     * @returns {string}
+     */
+    function montarRegistro(verificacao) {
+      const botoes = CONFIRMACOES.map((item) => botao({
+        acao: 'registrar', rotulo: item.rotulo, estilo: 'secundario', icone: item.icone,
+        id: `reg-${item.id}`, dados: { valor: item.id }, pressionado: verificacao.confirmacao === item.id,
+      }));
+      return `
+        <p class="acoes__rotulo" id="rotulo-registro">Depois de confirmar, registre o resultado:</p>
+        <div class="acoes__grupo" role="group" aria-labelledby="rotulo-registro">
+          <div class="acoes__dupla">${botoes[0]}${botoes[1]}</div>
+          ${botoes[2]}
+        </div>`;
+    }
+
+    /**
+     * Monta o resultado da comparação entre o contato recebido e os canais oficiais.
+     * @param {?Object} comparacao
+     * @param {Object} instituicao
+     * @returns {string}
+     */
+    function montarComparacao(comparacao, instituicao) {
+      if (!comparacao) return '';
+      if (comparacao.vazio) {
+        return erroDeCampo('erro-contato', 'Falta o contato para comparar. Digite o número, e-mail, site ou perfil que entrou em contato com você.');
+      }
+      if (comparacao.confere) {
+        return `<div class="aviso aviso--sucesso">${icone('circulo-check')}<div>
+            <p><strong>Confere.</strong> É igual ao canal oficial: ${escapar(comparacao.canal.rotulo)} (${escapar(comparacao.canal.valor)}).</p>
+            <p>Mesmo assim, o mais seguro é você ligar ou escrever para o canal oficial. O número que aparece em uma ligação pode ser falsificado.</p>
+          </div></div>`;
+      }
+      return `<div class="aviso aviso--erro">${icone('octogono')}<div>
+          <p><strong>Não confere.</strong> "${escapar(comparacao.contato)}" não é igual a nenhum canal oficial de ${escapar(instituicao.nome)}.</p>
+          <p>Não continue por esse contato. Fale com a instituição pelos canais acima.</p>
+        </div></div>`;
+    }
+
+    /**
+     * Monta os canais oficiais de uma instituição e a comparação de contato (RF08).
+     * @param {Verificacao} verificacao
+     * @param {Object} instituicao
+     * @returns {string}
+     */
+    function montarDetalheInstituicao(verificacao, instituicao) {
+      const telefones = instituicao.telefones
+        .map((telefone) => `<dd>${telefone.rotulo}: <strong class="inteiro">${telefone.valor}</strong></dd>`).join('');
+      const perfis = instituicao.perfis
+        .map((perfil) => `<dd><strong>${perfil}</strong>, com selo de verificado</dd>`).join('');
+      return `<section class="cartao" aria-labelledby="inst-nome">
+          <p class="etiqueta">${icone('frasco', 16)}Instituição fictícia de exemplo</p>
+          <h2 class="subtitulo" id="inst-nome" tabindex="-1">${instituicao.nome}</h2>
+          <h3 class="rotulo-secao">Canais oficiais</h3>
+          <dl class="canais">
+            <div><dt>${icone('telefone', 20)}Telefones</dt>${telefones}</div>
+            <div><dt>${icone('globo', 20)}Site</dt><dd><strong>${enderecoQuebravel(instituicao.site)}</strong></dd></div>
+            <div><dt>${icone('arroba', 20)}Perfis verificados</dt>${perfis}</div>
+            <div><dt>${icone('mensagem', 20)}Como costuma entrar em contato</dt><dd>${instituicao.costume}</dd></div>
+          </dl>
+          <div class="comparar">
+            <h3 class="rotulo-secao">Comparar com quem falou com você</h3>
+            <div class="campo">
+              <label class="rotulo" for="inst-contato">Número, e-mail, site ou perfil que entrou em contato</label>
+              <p class="dica" id="dica-contato">Copie do jeito que apareceu para você.</p>
+              <input class="entrada" id="inst-contato" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"
+                data-campo="inst-contato" data-enter="comparar" aria-describedby="dica-contato" value="${escapar(verificacao.inst.contato)}">
+            </div>
+            ${botao({ acao: 'comparar', rotulo: 'Comparar', estilo: 'secundario', id: 'btn-comparar' })}
+            <div id="inst-comparacao" role="status">${montarComparacao(verificacao.inst.comparacao, instituicao)}</div>
+          </div>
+          ${botao({ acao: 'trocar-inst', rotulo: 'Buscar outra instituição', estilo: 'texto', id: 'btn-trocar-inst' })}
+        </section>`;
+    }
+
+    /**
+     * Procura instituições do diretório pelo nome.
+     * @param {string} busca
+     * @returns {Array<Object>}
+     */
+    function buscarInstituicoes(busca) {
+      const termo = normalizar(busca);
+      return INSTITUICOES.filter((instituicao) => normalizar(instituicao.nome).includes(termo));
+    }
+
+    /**
+     * Monta a região abaixo do campo de busca: instituição aberta, lista de
+     * resultados ou orientação para quando a instituição não está no diretório.
+     * @param {Verificacao} verificacao
+     * @returns {string}
+     */
+    function montarRegiaoInstituicao(verificacao) {
+      const busca = verificacao.inst;
+      if (busca.selecionada) return montarDetalheInstituicao(verificacao, INSTITUICAO_POR_ID[busca.selecionada]);
+
+      const achadas = buscarInstituicoes(busca.busca);
+      if (!achadas.length) {
+        return `<div class="aviso aviso--alerta" role="status">${icone('cartao')}<div>
+            <p><strong>Não encontramos "${escapar(busca.busca.trim())}" no diretório.</strong></p>
+            <p>Use o telefone impresso no seu cartão ou digite o site da instituição direto no navegador. Não use telefone, link ou perfil que veio na mensagem.</p>
+          </div></div>`;
+      }
+
+      const itens = achadas.map((instituicao) => `
+        <li><button type="button" class="escolha" id="inst-op-${instituicao.id}" data-acao="selecionar-inst" data-id="${instituicao.id}">
+          <span class="escolha__icone" aria-hidden="true">${icone('predio')}</span>
+          <span class="escolha__texto"><strong>${instituicao.nome}</strong><span>${instituicao.ramo} · exemplo fictício</span></span>
+          ${icone('seta-dir', 20)}
+        </button></li>`).join('');
+      const titulo = normalizar(busca.busca) ? 'Instituições encontradas' : 'Instituições no diretório';
+      return `<section class="secao" aria-labelledby="tit-achadas">
+          <h2 class="rotulo-secao" id="tit-achadas">${titulo}</h2>
+          <ul class="escolhas">${itens}</ul>
+        </section>`;
+    }
+
+    /**
+     * Tela Confirmar com a instituição (RF08, RF10).
+     * @returns {PartesDaTela}
+     */
+    function montarConfirmarInstituicao() {
+      const verificacao = verificacaoAtual();
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Confirmar com a instituição</h1>
+        <p class="intro">Fale com a instituição por um canal que você mesmo procurou. Não use telefone, link ou perfil que veio na mensagem.</p>
+        <div class="campo">
+          <label class="rotulo" for="inst-busca">Nome da instituição</label>
+          <p class="dica" id="dica-busca">Digite o nome para buscar no diretório. Neste protótipo: Banco Exemplo, Loja Exemplo e Operadora Exemplo.</p>
+          <div class="busca">
+            ${icone('lupa', 20)}
+            <input class="entrada" id="inst-busca" type="search" autocomplete="off" data-campo="inst-busca"
+              aria-describedby="dica-busca" value="${escapar(verificacao.inst.busca)}">
+          </div>
+        </div>
+        <div id="inst-regiao">${montarRegiaoInstituicao(verificacao)}</div>`;
+      return { conteudo, acoes: montarRegistro(verificacao) };
+    }
+
+    /**
+     * Tela Confirmar com a pessoa (RF09, RF10).
+     * @returns {PartesDaTela}
+     */
+    function montarConfirmarPessoa() {
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Confirmar com a pessoa</h1>
+        <p class="intro">Antes de responder ou de enviar qualquer coisa, confirme que é a pessoa mesmo.</p>
+        <ol class="orientacoes">
+          <li class="orientacao"><div>
+            <strong>Ligue para o número que você já tinha salvo</strong>
+            <span>Use o contato antigo da sua agenda. Se a pessoa atender, pergunte se foi ela que escreveu.</span>
+          </div></li>
+          <li class="orientacao"><div>
+            <strong>Não responda pelo número novo</strong>
+            <span>Enquanto não confirmar, não mande mensagem, dinheiro nem código para o número novo.</span>
+          </div></li>
+          <li class="orientacao"><div>
+            <strong>Faça uma pergunta que só a pessoa saberia</strong>
+            <span>Por exemplo: "Onde a gente se viu pela última vez?". Evite perguntas que dá para descobrir nas redes sociais.</span>
+          </div></li>
+        </ol>`;
+      return { conteudo, acoes: montarRegistro(verificacaoAtual()) };
+    }
+
+    /**
+     * Tela Ver o que fazer agora (RF11, RF12).
+     * @returns {PartesDaTela}
+     */
+    function montarPassos() {
+      const ajuda = estado.sessao.ajuda;
+      const acolhimento = `<div class="acolhimento">${icone('coracao', 28)}<p>Acontece com muita gente. Agir rápido é o que mais importa.</p></div>`;
+      let corpo;
+
+      if (!ajuda.situacao) {
+        const escolhas = SITUACOES.map((situacao) => `
+          <li><button type="button" class="escolha escolha--sem-icone" id="sit-${situacao.id}" data-acao="situacao" data-valor="${situacao.id}">
+            <span class="escolha__texto"><strong>${situacao.rotulo}</strong><span>${situacao.dica}</span></span>
+            ${icone('seta-dir', 20)}
+          </button></li>`).join('');
+        corpo = `<section class="secao" aria-labelledby="tit-situacao">
+            <h2 class="subtitulo" id="tit-situacao" tabindex="-1">O que aconteceu até agora?</h2>
+            <p class="dica">Escolha a opção mais parecida com a sua situação para ver o passo a passo.</p>
+            <ul class="escolhas">${escolhas}</ul>
+          </section>`;
+      } else {
+        const situacao = SITUACAO_POR_ID[ajuda.situacao];
+        const marcados = ajuda.marcados[situacao.id] || [];
+        const feitos = marcados.filter(Boolean).length;
+        const passos = situacao.passos.map((passo, indice) => `
+          <li class="passo${marcados[indice] ? ' passo--feito' : ''}">
+            <label class="passo__marca" for="passo-${indice}">
+              <input type="checkbox" id="passo-${indice}" data-campo="passo" data-indice="${indice}"${marcados[indice] ? ' checked' : ''}>
+              <span class="passo__texto"><strong>${indice + 1}. ${passo.titulo}</strong><span>${passo.detalhe}</span></span>
+            </label>
+            ${passo.apoio ? botao({ acao: passo.apoio, rotulo: ROTULOS_APOIO[passo.apoio], estilo: 'mini', id: `apoio-${indice}` }) : ''}
+          </li>`).join('');
+        corpo = `
+          <div class="situacao-escolhida">
+            <p><span class="dica">Sua situação</span><strong>${situacao.rotulo}</strong></p>
+            <button type="button" class="botao botao--mini" id="btn-trocar-situacao" data-acao="trocar-situacao">Trocar<span class="sr-only"> situação</span></button>
+          </div>
+          <section class="secao" aria-labelledby="tit-passos">
+            <h2 class="subtitulo" id="tit-passos" tabindex="-1">Passo a passo</h2>
+            <p class="dica" role="status">${feitos} de ${situacao.passos.length} passos feitos. Marque cada passo quando terminar.</p>
+            <ol class="checklist">${passos}</ol>
+          </section>`;
+      }
+
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Ver o que fazer agora</h1>
+        ${acolhimento}
+        ${corpo}`;
+      const acoes = botao({ acao: 'concluir', rotulo: 'Concluir', icone: 'check', id: 'btn-concluir' });
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Tela Canais de ajuda (RF13).
+     * @returns {PartesDaTela}
+     */
+    function montarCanais() {
+      const cartoes = CANAIS_AJUDA.map((canal) => `
+        <section class="cartao" aria-labelledby="canal-${canal.id}">
+          <div class="canal__topo">
+            <span class="canal__icone" aria-hidden="true">${icone(canal.icone, 24)}</span>
+            <h2 class="subtitulo" id="canal-${canal.id}">${canal.nome}</h2>
+          </div>
+          <p>${canal.para}</p>
+          <div class="canal__contato">
+            <span class="dica">Contato oficial (fictício, só de exemplo)</span>
+            <span>${canal.contato.rotulo}</span>
+            <strong>${enderecoQuebravel(canal.contato.valor)}</strong>
+            <span class="dica">${canal.nota}</span>
+          </div>
+          <div>
+            <h3 class="rotulo-secao">Tenha em mãos</h3>
+            <ul class="lista-marcada">${canal.emMaos.map((item) => `<li>${icone('check', 18)}<span>${item}</span></li>`).join('')}</ul>
+          </div>
+        </section>`).join('');
+
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Canais de ajuda</h1>
+        <p class="intro">Fale com quem pode ajudar. Separe antes o que cada canal costuma pedir.</p>
+        ${cartoes}`;
+      const acoes = telaAnterior() === 'passos'
+        ? botao({ acao: 'voltar', rotulo: 'Voltar ao passo a passo', icone: 'seta-esq' }) : '';
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Monta o resumo de um relato já salvo ou enviado.
+     * @param {Relato} relato
+     * @returns {string}
+     */
+    function montarResumoRelato(relato) {
+      const remetente = REMETENTE_POR_ID[relato.remetente];
+      return `<dl class="resumo">
+          <div><dt>Tipo</dt><dd>${TIPO_POR_ID[relato.tipo].rotulo}</dd></div>
+          <div><dt>Quem o remetente dizia ser</dt><dd>${remetente ? remetente.rotulo : 'Não informado'}</dd></div>
+          <div><dt>O que foi pedido</dt><dd>${descreverPedidos(relato.pedidos)}</dd></div>
+          <div><dt>Texto do relato</dt><dd class="citacao">${escapar(relato.texto)}</dd></div>
+          <div><dt>Identificação</dt><dd>${relato.identificado ? `Identificado como ${escapar(relato.nome.trim())}` : 'Anônimo'}</dd></div>
+        </dl>`;
+    }
+
+    /**
+     * Monta o controle "Simular falha de conexão", que só existe no protótipo.
+     * @returns {string}
+     */
+    function montarControleDeFalha() {
+      return `<section class="prototipo" aria-label="Recurso do protótipo">
+          <p class="prototipo__selo">${icone('frasco', 18)}Recurso do protótipo</p>
+          ${opcao({ controle: 'checkbox', id: 'falha-conexao', nome: 'falha-conexao', campo: 'falha-conexao', valor: '1',
+            marcada: estado.falhaConexao, rotulo: 'Simular falha de conexão', descritoPor: 'dica-falha' })}
+          <p class="dica" id="dica-falha">Com a opção marcada, o envio falha e o relato fica salvo para depois.</p>
+        </section>`;
+    }
+
+    /**
+     * Tela Relatar a tentativa (RF14).
+     * @returns {PartesDaTela}
+     */
+    function montarRelatar() {
+      const relato = estado.sessao.relato;
+      const voltar = { acao: 'voltar', rotulo: 'Voltar ao passo a passo', icone: 'seta-esq' };
+      const titulo = '<h1 class="titulo" id="titulo-tela" tabindex="-1">Relatar a tentativa</h1>';
+
+      if (relato.envio === 'enviado') {
+        const conteudo = `${titulo}
+          <div class="aviso aviso--sucesso" id="relato-status" tabindex="-1" role="status">${icone('circulo-check')}<div>
+            <p><strong>Relato enviado.</strong></p>
+            <p>Obrigado. Ele vai virar alerta para outras pessoas, sem mostrar quem relatou.</p>
+          </div></div>
+          <section class="cartao" aria-label="O que foi enviado">${montarResumoRelato(relato)}</section>`;
+        return { conteudo, acoes: botao(voltar) };
+      }
+
+      if (relato.envio === 'pendente') {
+        const conteudo = `${titulo}
+          <div class="aviso aviso--alerta" id="relato-status" tabindex="-1" role="status">${icone('sem-sinal')}<div>
+            <p><strong>${relato.tentativas > 1 ? 'Ainda sem conexão.' : 'Sem conexão.'} Seu relato foi salvo neste aparelho.</strong></p>
+            <p>Ele ainda não foi enviado. Quando a conexão voltar, toque em "Tentar enviar agora".</p>
+          </div></div>
+          <section class="cartao" aria-label="Relato salvo para envio posterior">${montarResumoRelato(relato)}</section>
+          ${montarControleDeFalha()}`;
+        const acoes = botao({ acao: 'tentar-enviar', rotulo: 'Tentar enviar agora', icone: 'enviar', id: 'btn-tentar' })
+          + botao({ ...voltar, estilo: 'secundario' });
+        return { conteudo, acoes };
+      }
+
+      const tipos = TIPOS.map((tipo) =>
+        `<option value="${tipo.id}"${relato.tipo === tipo.id ? ' selected' : ''}>${tipo.rotulo}</option>`).join('');
+      const remetentes = [`<option value=""${relato.remetente ? '' : ' selected'}>Não informado</option>`]
+        .concat(REMETENTES.map((remetente) =>
+          `<option value="${remetente.id}"${relato.remetente === remetente.id ? ' selected' : ''}>${remetente.rotulo}</option>`)).join('');
+
+      const identificacao = [
+        { id: 'anonimo', rotulo: 'Anônimo', dica: 'Ninguém fica sabendo quem enviou', marcada: !relato.identificado },
+        { id: 'identificado', rotulo: 'Identificado', dica: 'Seu nome vai junto, só para quem analisa o relato', marcada: relato.identificado },
+      ].map((item) => opcao({
+        controle: 'radio', id: `ident-${item.id}`, nome: 'identificacao', campo: 'relato-identificacao',
+        valor: item.id, marcada: item.marcada, rotulo: item.rotulo, dica: item.dica,
+      })).join('');
+
+      const campoNome = relato.identificado ? `
+        <div class="campo">
+          <label class="rotulo" for="relato-nome">Seu nome</label>
+          <p class="dica" id="dica-nome">O nome nunca aparece no alerta que os outros usuários veem.</p>
+          <input class="entrada" id="relato-nome" type="text" autocomplete="name" data-campo="relato-nome"
+            aria-describedby="dica-nome${relato.erros.nome ? ' erro-nome' : ''}"${relato.erros.nome ? ' aria-invalid="true"' : ''} value="${escapar(relato.nome)}">
+          ${relato.erros.nome ? erroDeCampo('erro-nome', 'Falta o seu nome. Escreva o nome ou escolha "Anônimo" para enviar sem se identificar.') : ''}
+        </div>` : '';
+
+      const conteudo = `${titulo}
+        <div class="aviso aviso--info">${icone('pessoas')}<p>Seu relato vira um alerta para outras pessoas que receberem algo parecido. <strong>O alerta nunca mostra quem relatou.</strong></p></div>
+
+        <p class="intro">${verificacaoAtual() ? 'Já preenchemos com os dados da sua verificação. Mude o que quiser antes de enviar.' : 'Conte o que aconteceu. Você pode mudar tudo antes de enviar.'}</p>
+
+        <div class="campo">
+          <label class="rotulo" for="relato-tipo">Tipo de comunicação</label>
+          <select class="entrada" id="relato-tipo" data-campo="relato-tipo">${tipos}</select>
+        </div>
+        <div class="campo">
+          <label class="rotulo" for="relato-remetente">Quem o remetente dizia ser</label>
+          <select class="entrada" id="relato-remetente" data-campo="relato-remetente">${remetentes}</select>
+        </div>
+        ${grupoDePedidos({ prefixo: 'relped', campo: 'relato-pedido', legenda: 'O que foi pedido', marcados: relato.pedidos })}
+        <div class="campo">
+          <label class="rotulo" for="relato-texto">Texto do relato</label>
+          <p class="dica" id="dica-relato">Apague nomes ou dados que você não queira enviar.</p>
+          <textarea class="entrada" id="relato-texto" rows="5" data-campo="relato-texto"
+            aria-describedby="dica-relato${relato.erros.texto ? ' erro-relato' : ''}"${relato.erros.texto ? ' aria-invalid="true"' : ''}>${escapar(relato.texto)}</textarea>
+          ${relato.erros.texto ? erroDeCampo('erro-relato', 'Falta o texto do relato. Cole a mensagem recebida ou conte em poucas palavras o que aconteceu.') : ''}
+        </div>
+
+        <fieldset class="grupo">
+          <legend>Como você quer enviar</legend>
+          <div class="opcoes">${identificacao}</div>
+        </fieldset>
+        ${campoNome}
+        ${montarControleDeFalha()}`;
+
+      const acoes = botao({ acao: 'enviar-relato', rotulo: 'Enviar relato', icone: 'enviar', id: 'btn-enviar' });
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Tela Avisar os contatos (RF15).
+     * @returns {PartesDaTela}
+     */
+    function montarAvisar() {
+      const aviso = estado.sessao.aviso;
+      const status = aviso.compartilhado ? `
+        <div class="aviso aviso--sucesso" id="aviso-status" tabindex="-1" role="status">${icone('circulo-check')}<div>
+          <p><strong>Compartilhamento simulado.</strong></p>
+          <p>No aplicativo real, abriria a lista de aplicativos do celular para você escolher os contatos.</p>
+        </div></div>` : '';
+
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Avisar os contatos</h1>
+        <p class="intro">Avise as pessoas próximas para que não caiam no mesmo golpe. Você pode mudar o texto antes de compartilhar.</p>
+        <div class="campo">
+          <label class="rotulo" for="aviso-texto">Mensagem de alerta</label>
+          <p class="dica" id="dica-aviso">A mensagem já vem pronta. Edite se quiser.</p>
+          <textarea class="entrada" id="aviso-texto" rows="7" data-campo="aviso-texto"
+            aria-describedby="dica-aviso${aviso.erro ? ' erro-aviso' : ''}"${aviso.erro ? ' aria-invalid="true"' : ''}>${escapar(aviso.texto)}</textarea>
+          ${aviso.erro ? erroDeCampo('erro-aviso', 'Falta a mensagem. Escreva o alerta que você quer mandar para os seus contatos.') : ''}
+        </div>
+        ${status}
+        <section class="prototipo" aria-label="Recurso do protótipo">
+          <p class="prototipo__selo">${icone('frasco', 18)}Recurso do protótipo</p>
+          <p class="dica">O compartilhamento é simulado: nenhuma mensagem sai deste aparelho.</p>
+        </section>`;
+
+      const voltar = { acao: 'voltar', rotulo: 'Voltar ao passo a passo', icone: 'seta-esq' };
+      const compartilhar = { acao: 'compartilhar', rotulo: 'Compartilhar', icone: 'compartilhar', id: 'btn-compartilhar' };
+      const acoes = aviso.compartilhado
+        ? botao(voltar) + botao({ ...compartilhar, rotulo: 'Compartilhar de novo', estilo: 'secundario' })
+        : botao(compartilhar);
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Tela Conhecer os sinais de alerta (RF16).
+     * @returns {PartesDaTela}
+     */
+    function montarSinais() {
+      const veioDoResultado = telaAnterior() === 'resultado';
+      const parecido = veioDoResultado ? golpeParecido(verificacaoAtual()) : null;
+
+      const golpes = GOLPES.map((golpe) => `
+        <details class="sanfona" id="golpe-${golpe.id}"${golpe.id === parecido ? ' open' : ''}>
+          <summary>
+            <span class="golpe__icone" aria-hidden="true">${icone(golpe.icone)}</span>
+            <h2 class="sanfona__titulo">
+              <span>${golpe.nome}</span>
+              ${golpe.id === parecido ? '<span class="etiqueta">Parecido com o seu caso</span>' : ''}
+            </h2>
+            ${icone('seta-baixo', 20, 'seta')}
+          </summary>
+          <div class="sanfona__corpo">
+            <div><h3>Como funciona</h3><p>${golpe.como}</p></div>
+            <div><h3>Sinais</h3><ul class="lista-marcada">${golpe.sinais.map((sinal) => `<li>${icone('triangulo', 18)}<span>${sinal}</span></li>`).join('')}</ul></div>
+            <div><h3>Exemplo</h3><blockquote class="citacao">${golpe.exemplo}</blockquote></div>
+            <div><h3>Como confirmar</h3><p>${golpe.confirmar}</p></div>
+          </div>
+        </details>`).join('');
+
+      const conteudo = `
+        <h1 class="titulo" id="titulo-tela" tabindex="-1">Conhecer os sinais de alerta</h1>
+        <p class="intro">Veja como funcionam os golpes mais comuns. Toque em um tipo para abrir.</p>
+        ${golpes}`;
+
+      const acoes = veioDoResultado
+        ? botao({ acao: 'voltar', rotulo: 'Voltar ao resultado', icone: 'seta-esq' })
+        : botao({ acao: 'verificar', rotulo: 'Verificar uma comunicação', icone: 'lupa' });
+      return { conteudo, acoes };
+    }
+
+    /**
+     * Mapa das telas. `passo` indica a posição no fluxo de verificação (0 = fora dele).
+     * Para criar uma tela nova, basta acrescentar uma entrada aqui.
+     * @type {Object<string, {titulo: string, passo: number, montar: function(): PartesDaTela}>}
+     */
+    const TELAS = {
+      'inicio': { titulo: 'Início', passo: 0, montar: montarInicio },
+      'informar': { titulo: 'Informar a comunicação', passo: 1, montar: montarInformar },
+      'perguntas': { titulo: 'Perguntas rápidas', passo: 2, montar: montarPerguntas },
+      'resultado': { titulo: 'Resultado', passo: 3, montar: montarResultado },
+      'conf-inst': { titulo: 'Confirmar com a instituição', passo: 0, montar: montarConfirmarInstituicao },
+      'conf-pessoa': { titulo: 'Confirmar com a pessoa', passo: 0, montar: montarConfirmarPessoa },
+      'passos': { titulo: 'Ver o que fazer agora', passo: 0, montar: montarPassos },
+      'canais': { titulo: 'Canais de ajuda', passo: 0, montar: montarCanais },
+      'relatar': { titulo: 'Relatar a tentativa', passo: 0, montar: montarRelatar },
+      'avisar': { titulo: 'Avisar os contatos', passo: 0, montar: montarAvisar },
+      'sinais': { titulo: 'Conhecer os sinais de alerta', passo: 0, montar: montarSinais },
+    };
+
+    /* ========================================================================
+     * 9. Navegação
+     * ====================================================================== */
+
+    /**
+     * Id da tela aberta.
+     * @returns {string}
+     */
+    function telaAtual() {
+      return estado.pilha[estado.pilha.length - 1];
+    }
+
+    /**
+     * Id da tela de onde o usuário veio.
+     * @returns {?string}
+     */
+    function telaAnterior() {
+      return estado.pilha.length > 1 ? estado.pilha[estado.pilha.length - 2] : null;
+    }
+
+    /**
+     * Abre uma tela, guardando a atual para o botão Voltar.
+     * @param {string} tela
+     */
+    function ir(tela) {
+      if (telaAtual() === tela) return;
+      if (telaAtual() === 'inicio') estado.avisoInicio = '';
+      estado.pilha.push(tela);
+      desenhar();
+    }
+
+    /**
+     * Volta uma tela. Em "Perguntas rápidas", volta primeiro para a pergunta anterior.
+     * Os dados já informados continuam no estado (RNF06).
+     */
+    function voltar() {
+      const verificacao = verificacaoAtual();
+      if (telaAtual() === 'perguntas' && verificacao && verificacao.perguntaAtual > 0) {
+        verificacao.perguntaAtual -= 1;
+        desenhar({ foco: 'pergunta-texto' });
+        return;
+      }
+      if (estado.pilha.length <= 1) return;
+      estado.pilha.pop();
+      if (telaAtual() === 'inicio') {
+        estado.sessao = null;
+        estado.avisoInicio = '';
+      }
+      desenhar();
+    }
+
+    /**
+     * Volta direto ao Início e descarta o que não foi salvo.
+     * @param {string} aviso Mensagem de confirmação a mostrar no Início (pode ser vazia).
+     */
+    function irParaInicio(aviso) {
+      estado.pilha = ['inicio'];
+      estado.sessao = null;
+      estado.avisoInicio = aviso;
+      desenhar();
+    }
+
+    /**
+     * Encerramento (seção 5): salva a verificação e volta ao Início.
+     * @param {string} avisoNova Mensagem para quando a verificação entra no histórico agora.
+     */
+    function encerrar(avisoNova) {
+      const situacao = salvarSessao();
+      const aviso = situacao === 'nova' ? avisoNova
+        : situacao === 'atualizada' ? 'Verificação atualizada em "Suas verificações".'
+          : 'Passo a passo concluído. Se precisar de ajuda de novo, é só voltar.';
+      irParaInicio(aviso);
+    }
+
+    /* ========================================================================
+     * 10. Ações (toques) e campos (mudanças de valor)
+     * ====================================================================== */
+
+    /**
+     * Valida a tela "Informar a comunicação" e avança para as perguntas (RF04).
+     * Se faltar conteúdo ou remetente, mostra o erro no campo e não avança.
+     */
+    function continuarInformar() {
+      const verificacao = verificacaoAtual();
+      const erros = {};
+      if (!verificacao.conteudo.trim()) erros.conteudo = true;
+      if (!verificacao.remetente) erros.remetente = true;
+      verificacao.erros = erros;
+
+      if (erros.conteudo || erros.remetente) {
+        atualizar();
+        focarComRolagem(erros.conteudo ? 'campo-conteudo' : 'rem-pessoa');
+        return;
+      }
+      const primeiraSemResposta = verificacao.respostas.indexOf(null);
+      verificacao.perguntaAtual = primeiraSemResposta === -1 ? 0 : primeiraSemResposta;
+      ir('perguntas');
+    }
+
+    /**
+     * Registra a resposta da pergunta em exibição. Na última, calcula o risco e
+     * abre o Resultado na mesma hora (RNF08).
+     * @param {Resposta} valor
+     */
+    function responder(valor) {
+      const verificacao = verificacaoAtual();
+      verificacao.respostas[verificacao.perguntaAtual] = valor;
+      if (verificacao.perguntaAtual < PERGUNTAS.length - 1) {
+        verificacao.perguntaAtual += 1;
+        desenhar({ foco: 'pergunta-texto' });
+        return;
+      }
+      verificacao.risco = Risco.calcular(verificacao);
+      verificacao.data = new Date();
+      ir('resultado');
+    }
+
+    /**
+     * Abre "Confirmar com a instituição". Na primeira vez, sugere na busca a
+     * instituição citada no texto informado, se ela estiver no diretório.
+     */
+    function abrirConfirmarInstituicao() {
+      const verificacao = verificacaoAtual();
+      if (!verificacao.inst.iniciada) {
+        verificacao.inst.iniciada = true;
+        const texto = normalizar(verificacao.conteudo);
+        const citada = INSTITUICOES.find((instituicao) => texto.includes(normalizar(instituicao.nome)));
+        if (citada) verificacao.inst.busca = citada.nome;
+      }
+      ir('conf-inst');
+    }
+
+    /**
+     * Compara o contato digitado com os canais oficiais da instituição aberta.
+     */
+    function compararContato() {
+      const verificacao = verificacaoAtual();
+      const instituicao = INSTITUICAO_POR_ID[verificacao.inst.selecionada];
+      const contato = verificacao.inst.contato.trim();
+      verificacao.inst.comparacao = contato
+        ? { ...Comparador.comparar(contato, instituicao), contato }
+        : { vazio: true };
+      document.getElementById('inst-comparacao').innerHTML = montarComparacao(verificacao.inst.comparacao, instituicao);
+      if (!contato) focar('inst-contato');
+    }
+
+    /**
+     * Registra o resultado da confirmação (RF10): legítimo encerra; golpe ou
+     * não confirmado leva ao passo a passo.
+     * @param {Confirmacao} valor
+     */
+    function registrarConfirmacao(valor) {
+      verificacaoAtual().confirmacao = valor;
+      if (valor === 'legitimo') {
+        encerrar('Verificação salva como legítima em "Suas verificações".');
+        return;
+      }
+      ir('passos');
+    }
+
+    /**
+     * Valida o relato e tenta enviar. Só é chamada por toque do usuário (RNF05).
+     */
+    function enviarRelato() {
+      const relato = estado.sessao.relato;
+      const erros = {};
+      if (!relato.texto.trim()) erros.texto = true;
+      if (relato.identificado && !relato.nome.trim()) erros.nome = true;
+      relato.erros = erros;
+      if (erros.texto || erros.nome) {
+        atualizar();
+        focarComRolagem(erros.texto ? 'relato-texto' : 'relato-nome');
+        return;
+      }
+      tentarEnvioDoRelato();
+    }
+
+    /**
+     * Simula o envio do relato. Com "Simular falha de conexão" ligado, o relato
+     * fica salvo para envio posterior e o usuário é avisado (RF14).
+     */
+    function tentarEnvioDoRelato() {
+      const relato = estado.sessao.relato;
+      relato.tentativas += 1;
+      relato.envio = estado.falhaConexao ? 'pendente' : 'enviado';
+      desenhar({ foco: 'relato-status' });
+    }
+
+    /**
+     * Simula o compartilhamento da mensagem de alerta (RF15).
+     */
+    function compartilharAviso() {
+      const aviso = estado.sessao.aviso;
+      if (!aviso.texto.trim()) {
+        aviso.erro = true;
+        atualizar();
+        focarComRolagem('aviso-texto');
+        return;
+      }
+      aviso.erro = false;
+      aviso.compartilhado = true;
+      desenhar({ foco: 'aviso-status' });
+    }
+
+    /**
+     * Ações disparadas por toque em elementos com `data-acao`.
+     * @type {Object<string, function(HTMLElement): void>}
+     */
+    const ACOES = {
+      // Moldura
+      'voltar': () => voltar(),
+      'inicio': () => {
+        if (telaAtual() === 'inicio') { el.conteudo.scrollTop = 0; return; }
+        irParaInicio('');
+      },
+      'ajuda': () => ir('canais'),
+
+      // Início
+      'verificar': () => {
+        estado.sessao = criarSessao(criarVerificacao(null));
+        ir('informar');
+      },
+      'simular': (alvo) => {
+        estado.sessao = criarSessao(criarVerificacao(EXEMPLOS[alvo.dataset.exemplo]));
+        ir('informar');
+      },
+      'ja-cai': () => {
+        estado.sessao = criarSessao(null);
+        ir('passos');
+      },
+      'sinais': () => ir('sinais'),
+      'abrir-salva': (alvo) => {
+        const sessao = estado.historico.find((item) => String(item.verificacao.id) === alvo.dataset.id);
+        if (!sessao) return;
+        estado.sessao = sessao;
+        ir('resultado');
+      },
+
+      // Verificação
+      'continuar': () => continuarInformar(),
+      'responder': (alvo) => responder(alvo.dataset.valor),
+
+      // Resultado
+      'confirmar-instituicao': () => abrirConfirmarInstituicao(),
+      'confirmar-pessoa': () => ir('conf-pessoa'),
+      'o-que-fazer': () => ir('passos'),
+      'entender-sinal': () => ir('sinais'),
+      'encerrar': () => encerrar('Verificação encerrada e salva em "Suas verificações".'),
+
+      // Confirmações
+      'selecionar-inst': (alvo) => {
+        const busca = verificacaoAtual().inst;
+        busca.selecionada = alvo.dataset.id;
+        busca.comparacao = null;
+        atualizar();
+        focar('inst-nome');
+      },
+      'trocar-inst': () => {
+        const busca = verificacaoAtual().inst;
+        busca.selecionada = null;
+        busca.busca = '';
+        busca.contato = '';
+        busca.comparacao = null;
+        atualizar();
+        focar('inst-busca');
+      },
+      'comparar': () => compararContato(),
+      'registrar': (alvo) => registrarConfirmacao(alvo.dataset.valor),
+
+      // Ver o que fazer agora
+      'situacao': (alvo) => {
+        estado.sessao.ajuda.situacao = alvo.dataset.valor;
+        atualizar();
+        focar('tit-passos');
+      },
+      'trocar-situacao': () => {
+        estado.sessao.ajuda.situacao = null;
+        atualizar();
+        focar('tit-situacao');
+      },
+      'canais': () => ir('canais'),
+      'relatar': () => { prepararRelato(); ir('relatar'); },
+      'avisar': () => ir('avisar'),
+      'concluir': () => encerrar('Verificação concluída e salva em "Suas verificações".'),
+
+      // Relato e aviso
+      'enviar-relato': () => enviarRelato(),
+      'tentar-enviar': () => tentarEnvioDoRelato(),
+      'compartilhar': () => compartilharAviso(),
+    };
+
+    /**
+     * Tratadores de mudança em elementos com `data-campo`. Campos de texto só
+     * atualizam o estado (sem redesenhar, para não atrapalhar a digitação);
+     * opções redesenham a tela mantendo o foco.
+     * @type {Object<string, function(HTMLInputElement): void>}
+     */
+    const CAMPOS = {
+      // Informar a comunicação
+      'tipo': (alvo) => {
+        verificacaoAtual().tipo = alvo.value;
+        atualizar();
+      },
+      'conteudo': (alvo) => {
+        const verificacao = verificacaoAtual();
+        verificacao.conteudo = alvo.value;
+        if (verificacao.erros.conteudo && alvo.value.trim()) {
+          delete verificacao.erros.conteudo;
+          limparErroNoLugar('campo-conteudo', 'erro-conteudo');
+        }
+      },
+      'remetente': (alvo) => {
+        const verificacao = verificacaoAtual();
+        verificacao.remetente = alvo.value;
+        delete verificacao.erros.remetente;
+        atualizar();
+      },
+      'pedido': (alvo) => {
+        const verificacao = verificacaoAtual();
+        verificacao.pedidos = alternarPedido(verificacao.pedidos, alvo.value, alvo.checked);
+        atualizar();
+      },
+
+      // Confirmar com a instituição
+      'inst-busca': (alvo) => {
+        const verificacao = verificacaoAtual();
+        verificacao.inst.busca = alvo.value;
+        verificacao.inst.selecionada = null;
+        verificacao.inst.comparacao = null;
+        document.getElementById('inst-regiao').innerHTML = montarRegiaoInstituicao(verificacao);
+        const quantidade = buscarInstituicoes(alvo.value).length;
+        anunciar(quantidade === 1 ? '1 instituição encontrada' : `${quantidade} instituições encontradas`);
+      },
+      'inst-contato': (alvo) => {
+        const busca = verificacaoAtual().inst;
+        busca.contato = alvo.value;
+        if (busca.comparacao) {
+          busca.comparacao = null;
+          document.getElementById('inst-comparacao').innerHTML = '';
+        }
+      },
+
+      // Ver o que fazer agora
+      'passo': (alvo) => {
+        const ajuda = estado.sessao.ajuda;
+        const marcados = ajuda.marcados[ajuda.situacao] || [];
+        marcados[Number(alvo.dataset.indice)] = alvo.checked;
+        ajuda.marcados[ajuda.situacao] = marcados;
+        atualizar();
+      },
+
+      // Relatar a tentativa
+      'relato-tipo': (alvo) => { estado.sessao.relato.tipo = alvo.value; },
+      'relato-remetente': (alvo) => { estado.sessao.relato.remetente = alvo.value; },
+      'relato-pedido': (alvo) => {
+        const relato = estado.sessao.relato;
+        relato.pedidos = alternarPedido(relato.pedidos, alvo.value, alvo.checked);
+        atualizar();
+      },
+      'relato-texto': (alvo) => {
+        const relato = estado.sessao.relato;
+        relato.texto = alvo.value;
+        if (relato.erros.texto && alvo.value.trim()) {
+          delete relato.erros.texto;
+          limparErroNoLugar('relato-texto', 'erro-relato');
+        }
+      },
+      'relato-identificacao': (alvo) => {
+        const relato = estado.sessao.relato;
+        relato.identificado = alvo.value === 'identificado';
+        delete relato.erros.nome;
+        atualizar();
+      },
+      'relato-nome': (alvo) => {
+        const relato = estado.sessao.relato;
+        relato.nome = alvo.value;
+        if (relato.erros.nome && alvo.value.trim()) {
+          delete relato.erros.nome;
+          limparErroNoLugar('relato-nome', 'erro-nome');
+        }
+      },
+      'falha-conexao': (alvo) => {
+        estado.falhaConexao = alvo.checked;
+        atualizar();
+      },
+
+      // Avisar os contatos
+      'aviso-texto': (alvo) => {
+        const aviso = estado.sessao.aviso;
+        aviso.texto = alvo.value;
+        if (aviso.erro && alvo.value.trim()) {
+          aviso.erro = false;
+          limparErroNoLugar('aviso-texto', 'erro-aviso');
+        }
+      },
+    };
+
+    /**
+     * Diz se o elemento é um campo de digitação (tratado no evento `input`).
+     * Rádios, caixas e listas são tratados no evento `change`.
+     * @param {EventTarget} alvo
+     * @returns {boolean}
+     */
+    function ehCampoDeTexto(alvo) {
+      if (alvo.tagName === 'TEXTAREA') return true;
+      return alvo.tagName === 'INPUT' && alvo.type !== 'radio' && alvo.type !== 'checkbox';
+    }
+
+    /**
+     * Encaminha a mudança de um campo para o tratador certo em CAMPOS.
+     * @param {EventTarget} alvo
+     */
+    function tratarCampo(alvo) {
+      const tratador = alvo.dataset ? CAMPOS[alvo.dataset.campo] : null;
+      if (tratador) tratador(alvo);
+    }
+
+    /**
+     * Liga os eventos uma única vez, na moldura. As telas são redesenhadas por
+     * cima sem precisar religar nada (delegação de eventos).
+     */
+    function ligarEventos() {
+      el.app.addEventListener('click', (evento) => {
+        const alvo = evento.target.closest('[data-acao]');
+        if (!alvo || !el.app.contains(alvo)) return;
+        const acao = ACOES[alvo.dataset.acao];
+        if (acao) acao(alvo);
+      });
+
+      el.app.addEventListener('input', (evento) => {
+        if (ehCampoDeTexto(evento.target)) tratarCampo(evento.target);
+      });
+
+      el.app.addEventListener('change', (evento) => {
+        if (!ehCampoDeTexto(evento.target)) tratarCampo(evento.target);
+      });
+
+      // Enter em um campo com `data-enter` dispara a ação indicada (ex.: comparar).
+      el.app.addEventListener('keydown', (evento) => {
+        const alvo = evento.target;
+        if (evento.key !== 'Enter' || !alvo.dataset || !alvo.dataset.enter) return;
+        evento.preventDefault();
+        const acao = ACOES[alvo.dataset.enter];
+        if (acao) acao(alvo);
+      });
+    }
+
+    /* ========================================================================
+     * 11. Partida
+     * ====================================================================== */
+
+    ligarEventos();
+    desenhar({ manterFoco: true }); // primeira tela: não rouba o foco ao abrir a página
+
+    // Módulos puros expostos só para conferência do protótipo pelo console
+    // (por exemplo: ConfereAi.Risco.nivelPorPontos(7)). Não fazem parte da interface.
+    window.ConfereAi = Object.freeze({ Risco, Comparador });
+  })();
+  </script>
+</body>
+</html>
